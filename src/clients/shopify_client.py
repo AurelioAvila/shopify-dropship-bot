@@ -81,6 +81,11 @@ class ShopifyClient:
         resp.raise_for_status()
         return resp.json()["products"]
 
+    def delete_product(self, product_id: int) -> None:
+        self._ensure_token()
+        resp = self.session.delete(self._url(f"products/{product_id}.json"))
+        resp.raise_for_status()
+
     def list_unfulfilled_orders(self) -> list[dict]:
         self._ensure_token()
         resp = self.session.get(
