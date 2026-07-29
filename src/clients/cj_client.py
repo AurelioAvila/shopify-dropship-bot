@@ -54,7 +54,11 @@ class CJClient:
 
         resp = self.session.get(f"{BASE_URL}/product/listV2", headers=self._headers(), params=params)
         resp.raise_for_status()
-        return resp.json()["data"]["list"]
+        content = resp.json()["data"]["content"]
+        products = []
+        for group in content:
+            products.extend(group.get("productList", []))
+        return products
 
     def get_product_detail(self, pid: str) -> dict:
         resp = self.session.get(f"{BASE_URL}/product/query", headers=self._headers(), params={"pid": pid})

@@ -32,7 +32,7 @@ def import_keyword(keyword: str, limit: int = 10) -> None:
         pid = item["id"]
         detail = cj.get_product_detail(pid)
         title = detail.get("productNameEn") or item.get("nameEn")
-        images = [detail.get("productImage")] if detail.get("productImage") else []
+        images = detail.get("productImageSet") or ([detail["bigImage"]] if detail.get("bigImage") else [])
         variants = detail.get("variants", [])
         if not variants:
             print(f"  - skip {title}: nessuna variante trovata")
