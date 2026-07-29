@@ -8,11 +8,18 @@ principali di AutoDS: import prodotti, sync prezzo/stock, evasione ordini automa
 1. `python -m venv .venv && .venv\Scripts\activate` (Windows)
 2. `pip install -r requirements.txt`
 3. Copia `.env.example` in `.env` e compila:
-   - `SHOPIFY_STORE_DOMAIN` / `SHOPIFY_ADMIN_API_TOKEN`: da Shopify Admin ->
-     Impostazioni -> App e canali di vendita -> Sviluppa app -> Crea un'app.
+   - `SHOPIFY_STORE_DOMAIN` / `SHOPIFY_CLIENT_ID` / `SHOPIFY_CLIENT_SECRET`: da
+     Dev Dashboard (dev.shopify.com) -> la tua app -> Impostazioni -> Credenziali.
      Scope necessari: `read_products, write_products, read_orders, write_orders,
-     read_inventory, write_inventory`.
-   - `CJ_EMAIL` / `CJ_API_KEY`: da CJdropshipping -> My CJ -> API.
+     read_inventory, write_inventory, read_locations`, e per la pubblicazione
+     social anche `read_files, write_files` (serve per ospitare i video sul CDN
+     Shopify e ottenere un URL pubblico da passare a Instagram).
+   - `CJ_API_KEY`: da CJdropshipping -> https://www.cjdropshipping.com/my.html#/authorize/API
+     -> tab API -> Add API -> tipo "API Key".
+   - `TIKTOK_{BRAND}_*`: genera con `python get_tiktok_token.py NOME_BRAND`
+     (vedi prerequisiti nel file stesso - serve un'app su developers.tiktok.com).
+   - `INSTAGRAM_{BRAND}_*`: access token di lunga durata + ID account Instagram
+     Business, generati da https://developers.facebook.com/ (Meta for Developers).
 
 ## Uso
 
@@ -28,7 +35,28 @@ python -m src.jobs.fulfill_orders
 
 # 4. Aggiorna il tracking quando CJ spedisce (schedulare ogni 2-3h)
 python -m src.jobs.update_tracking
+
+# 5. Genera video promozionali (immagini prodotto CJ + voce IA + sottotitoli)
+python -m src.jobs.generate_promo_videos
+
+# 6. Pubblica i video su TikTok + Instagram, sul brand giusto per nicchia
+python -m src.jobs.publish_promo_videos
+python -m src.jobs.publish_promo_videos --video 1_nail_clipper_satisfying
+python -m src.jobs.publish_promo_videos --only-tiktok
 ```
+
+### Pubblicazione social multi-brand
+
+`publish_promo_videos.py` mappa ogni video generato a un brand (nicchia pet o
+tech, vedi dizionario `VIDEOS` nel file) e pubblica su TikTok + Instagram con
+le credenziali di quel brand specifico. Per aggiungere prodotti/video nuovi:
+aggiungi una voce a `SCRIPTS` in `generate_promo_videos.py` e una corrispondente
+in `VIDEOS` in `publish_promo_videos.py`.
+
+Nota: finche' l'app TikTok non ha superato l'audit "Direct Post" (4-10
+settimane), i video pubblicati restano privati (SELF_ONLY) lato TikTok anche
+se il codice richiede PUBLIC_TO_EVERYONE - non e' un bug, e' una limitazione
+della piattaforma durante la fase di review.
 
 ## Scheduling persistente
 

@@ -1,3 +1,4 @@
+import os
 import time
 
 import requests
@@ -85,6 +86,83 @@ class ShopifyClient:
         self._ensure_token()
         resp = self.session.delete(self._url(f"products/{product_id}.json"))
         resp.raise_for_status()
+
+    def _graphql(self, query: str, variables: dict) -> dict:
+        self._ensure_token()
+        resp = self.session.post(self._url("graphql.json"), json={"query": query, "variables": variables})
+        resp.raise_for_status()
+        data = resp.json()
+        if "errors" in data:
+            raise RuntimeError(f"Errore GraphQL Shopify: {data['errors']}")
+        return data["data"]
+
+    def upload_video_get_public_url(self, file_path: str, alt: str = "") -> str:
+        """Carica un file video su Shopify (CDN) e ne restituisce l'URL pubblico
+        riproducibile, necessario per pubblicare Reels via Instagram Graph API
+        (che richiede un video_url pubblico, non un upload diretto di file)."""
+        filename = os.path.basename(file_path)
+        file_size = str(os.path.getsize(file_path))
+
+        staged = self._graphql(
+            """
+            mutation stagedUploadsCreate($input: [StagedUploadInput!]!) {
+              stagedUploadsCreate(input: $input) {
+                stagedTargets { url resourceUrl parameters { name value } }
+                userErrors { field message }
+              }
+            }
+            """,
+            {"input": [{
+                "filename": filename, "mimeType": "video/mp4",
+                "resource": "VIDEO", "httpMethod": "POST", "fileSize": file_size,
+            }]},
+        )["stagedUploadsCreate"]
+        if staged["userErrors"]:
+            raise RuntimeError(f"stagedUploadsCreate error: {staged['userErrors']}")
+        target = staged["stagedTargets"][0]
+
+        form_data = {p["name"]: p["value"] for p in target["parameters"]}
+        with open(file_path, "rb") as f:
+            upload_resp = requests.post(target["url"], data=form_data, files={"file": (filename, f)})
+        upload_resp.raise_for_status()
+
+        created = self._graphql(
+            """
+            mutation fileCreate($files: [FileCreateInput!]!) {
+              fileCreate(files: $files) {
+                files { id fileStatus ... on Video { sources { url } } }
+                userErrors { field message }
+              }
+            }
+            """,
+            {"files": [{"alt": alt, "contentType": "VIDEO", "originalSource": target["resourceUrl"]}]},
+        )["fileCreate"]
+        if created["userErrors"]:
+            raise RuntimeError(f"fileCreate error: {created['userErrors']}")
+        file_id = created["files"][0]["id"]
+
+        return self._poll_file_ready(file_id)
+
+    def _poll_file_ready(self, file_id: str, timeout: int = 120) -> str:
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            data = self._graphql(
+                """
+                query($id: ID!) {
+                  node(id: $id) {
+                    ... on Video { fileStatus sources { url } }
+                  }
+                }
+                """,
+                {"id": file_id},
+            )
+            node = data["node"]
+            if node["fileStatus"] == "READY" and node["sources"]:
+                return node["sources"][0]["url"]
+            if node["fileStatus"] == "FAILED":
+                raise RuntimeError("Elaborazione video fallita su Shopify")
+            time.sleep(3)
+        raise TimeoutError("Timeout in attesa che Shopify elabori il video")
 
     def list_unfulfilled_orders(self) -> list[dict]:
         self._ensure_token()
