@@ -39,6 +39,19 @@ class CJClient:
     def _headers(self) -> dict:
         return {"CJ-Access-Token": self._get_token(), "Content-Type": "application/json"}
 
+    def _request(self, method: str, url: str, max_retries: int = 5, **kwargs) -> requests.Response:
+        """Chiama l'API CJ ritentando in automatico sui 429 (rate limit stretto lato CJ)."""
+        for attempt in range(max_retries):
+            resp = self.session.request(method, url, headers=self._headers(), **kwargs)
+            if resp.status_code != 429:
+                resp.raise_for_status()
+                return resp
+            wait = float(resp.headers.get("Retry-After", 2 ** attempt))
+            print(f"    (rate limit CJ, riprovo tra {wait:.0f}s...)")
+            time.sleep(wait)
+        resp.raise_for_status()
+        return resp
+
     def search_products(self, keyword: str = "", category_id: str = "", page: int = 1,
                          size: int = 20, min_price: float | None = None,
                          max_price: float | None = None) -> list[dict]:
@@ -52,8 +65,7 @@ class CJClient:
         if max_price is not None:
             params["endSellPrice"] = max_price
 
-        resp = self.session.get(f"{BASE_URL}/product/listV2", headers=self._headers(), params=params)
-        resp.raise_for_status()
+        resp = self._request("GET", f"{BASE_URL}/product/listV2", params=params)
         content = resp.json()["data"]["content"]
         products = []
         for group in content:
@@ -61,16 +73,14 @@ class CJClient:
         return products
 
     def get_product_detail(self, pid: str) -> dict:
-        resp = self.session.get(f"{BASE_URL}/product/query", headers=self._headers(), params={"pid": pid})
-        resp.raise_for_status()
+        resp = self._request("GET", f"{BASE_URL}/product/query", params={"pid": pid})
         return resp.json()["data"]
 
-    def get_stock(self, vid: str) -> dict:
-        resp = self.session.get(
-            f"{BASE_URL}/product/stock/queryByVid", headers=self._headers(), params={"vid": vid}
-        )
-        resp.raise_for_status()
-        return resp.json()["data"]
+    def get_total_stock(self, vid: str) -> int:
+        """Somma lo stock disponibile su tutti i magazzini per una variante."""
+        resp = self._request("GET", f"{BASE_URL}/product/stock/queryByVid", params={"vid": vid})
+        warehouses = resp.json()["data"]
+        return sum(w.get("totalInventoryNum", 0) for w in warehouses)
 
     def create_order(self, order_number: str, shipping_country_code: str, shipping_customer_name: str,
                       shipping_address: dict, products: list[dict], logistic_name: str = "CJPacket") -> dict:
@@ -82,15 +92,9 @@ class CJClient:
             "logisticName": logistic_name,
             "products": products,
         }
-        resp = self.session.post(
-            f"{BASE_URL}/shopping/order/createOrderV2", headers=self._headers(), json=payload
-        )
-        resp.raise_for_status()
+        resp = self._request("POST", f"{BASE_URL}/shopping/order/createOrderV2", json=payload)
         return resp.json()["data"]
 
     def get_order_detail(self, order_id: str) -> dict:
-        resp = self.session.get(
-            f"{BASE_URL}/shopping/order/getOrderDetail", headers=self._headers(), params={"orderId": order_id}
-        )
-        resp.raise_for_status()
+        resp = self._request("GET", f"{BASE_URL}/shopping/order/getOrderDetail", params={"orderId": order_id})
         return resp.json()["data"]

@@ -20,11 +20,21 @@ def sync_all() -> None:
     rows = conn.execute("SELECT * FROM product_map").fetchall()
     cols = [d[0] for d in conn.execute("SELECT * FROM product_map").description]
 
+    existing_variant_ids = {
+        v["id"] for p in shopify.list_products(limit=250) for v in p["variants"]
+    }
+
     print(f"Sincronizzo {len(rows)} varianti...")
     for row in rows:
         r = dict(zip(cols, row))
-        stock = cj.get_stock(r["cj_vid"])
-        available = int(stock.get("totalInventoryNum", 0))
+
+        if r["shopify_variant_id"] not in existing_variant_ids:
+            conn.execute("DELETE FROM product_map WHERE shopify_variant_id = ?", (r["shopify_variant_id"],))
+            conn.commit()
+            print(f"  - variant {r['shopify_variant_id']}: non esiste piu' su Shopify, rimosso dalla mappatura")
+            continue
+
+        available = cj.get_total_stock(r["cj_vid"])
 
         detail = cj.get_product_detail(r["cj_pid"])
         variant = next((v for v in detail.get("variants", []) if v.get("vid") == r["cj_vid"]), None)
