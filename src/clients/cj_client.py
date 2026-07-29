@@ -27,7 +27,7 @@ class CJClient:
 
         resp = self.session.post(
             f"{BASE_URL}/authentication/getAccessToken",
-            json={"email": config.CJ_EMAIL, "password": config.CJ_API_KEY},
+            json={"apiKey": config.CJ_API_KEY},
         )
         resp.raise_for_status()
         data = resp.json()["data"]
