@@ -21,35 +21,39 @@ OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data", "promo_
 PET_BRAND = "GROOMLYCO"
 TECH_BRAND = "MAGDOCK"
 
+# Reels non supportano link cliccabili nel testo, quindi ogni caption chiude
+# con un richiamo esplicito al link in bio (che punta allo store Shopify).
+_CTA = "Shop the link in our bio 🛒"
+
 VIDEOS = {
     "1_nail_clipper_satisfying": {
         "brand": PET_BRAND,
-        "caption": "My dog used to hate nail trims, until I found this 🐾 "
+        "caption": f"My dog used to hate nail trims, until I found this 🐾 {_CTA} "
                     "#dogsoftiktok #petcare #satisfying",
     },
     "2_nail_trimmer_mythbust": {
         "brand": PET_BRAND,
-        "caption": "The mistake almost everyone makes when trimming their dog's nails 🐶 "
+        "caption": f"The mistake almost everyone makes when trimming their dog's nails 🐶 {_CTA} "
                     "#doggrooming #pettips #dogtok",
     },
     "3_grooming_table": {
         "brand": PET_BRAND,
-        "caption": "Grooming multiple dogs doesn't have to be chaos 🐕 "
+        "caption": f"Grooming multiple dogs doesn't have to be chaos 🐕 {_CTA} "
                     "#doggrooming #multidog #petcare",
     },
     "4_magsafe_wallet_stresstest": {
         "brand": TECH_BRAND,
-        "caption": "I stress-tested this MagSafe case so you don't have to 📱 "
+        "caption": f"I stress-tested this MagSafe case so you don't have to 📱 {_CTA} "
                     "#magsafe #phoneaccessories #techtok",
     },
     "5_car_mount_comparison": {
         "brand": TECH_BRAND,
-        "caption": "The difference only shows up when it's too late 🚗 "
+        "caption": f"The difference only shows up when it's too late 🚗 {_CTA} "
                     "#carmount #phonemount #techtok",
     },
     "6_car_mount_pov": {
         "brand": TECH_BRAND,
-        "caption": "POV: your phone never drops in the car again 📱🚗 "
+        "caption": f"POV: your phone never drops in the car again 📱🚗 {_CTA} "
                     "#caraccessories #lifehack #fyp",
     },
 }
