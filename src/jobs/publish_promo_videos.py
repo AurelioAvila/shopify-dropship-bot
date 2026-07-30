@@ -17,10 +17,9 @@ from src.social.tiktok_upload import upload_video
 OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data", "promo_videos")
 
 # Ogni video generato viene mappato al brand giusto (nicchia pet vs tech) e
-# alla caption/hashtag da usare in pubblicazione. Aggiorna PET_BRAND/TECH_BRAND
-# con i nomi scelti (es. "PawTrim", "MagDock").
-PET_BRAND = "PET"
-TECH_BRAND = "TECH"
+# alla caption/hashtag da usare in pubblicazione.
+PET_BRAND = "GROOMLYCO"
+TECH_BRAND = "MAGDOCK"
 
 VIDEOS = {
     "1_nail_clipper_satisfying": {
