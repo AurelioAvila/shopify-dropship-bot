@@ -57,6 +57,14 @@ class ShopifyClient:
         resp.raise_for_status()
         return resp.json()["product"]
 
+    def update_product_description(self, product_id: int, description_html: str) -> None:
+        self._ensure_token()
+        resp = self.session.put(
+            self._url(f"products/{product_id}.json"),
+            json={"product": {"id": product_id, "body_html": description_html}},
+        )
+        resp.raise_for_status()
+
     def update_variant_price_and_stock(self, variant_id: int, inventory_item_id: int, location_id: int,
                                         price: float, available: int) -> None:
         self._ensure_token()
