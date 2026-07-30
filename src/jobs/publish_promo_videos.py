@@ -85,7 +85,11 @@ def publish_all(only: str | None = None, skip_tiktok: bool = False, skip_instagr
 
         if not skip_tiktok:
             try:
-                upload_video(brand, video_path, caption, privacy_level="PUBLIC_TO_EVERYONE")
+                # SELF_ONLY finche' l'app non supera l'audit "Direct Post" di
+                # TikTok - PUBLIC_TO_EVERYONE fallirebbe con 403
+                # unaudited_client_can_only_post_to_private_accounts finche'
+                # l'account resta privato (obbligatorio pre-audit).
+                upload_video(brand, video_path, caption, privacy_level="SELF_ONLY")
             except Exception as exc:
                 print(f"  ! {video_id}: errore pubblicazione TikTok: {exc}")
 
