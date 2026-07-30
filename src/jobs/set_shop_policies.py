@@ -9,7 +9,7 @@ Uso:
 from src.clients.shopify_client import ShopifyClient
 
 STORE_NAME = "our store"
-CONTACT_EMAIL = "support@91zey8-ha.myshopify.com"  # aggiorna con la tua email di supporto reale
+CONTACT_EMAIL = "canadesino91@gmail.com"
 
 POLICIES = {
     "SHIPPING_POLICY": f"""
