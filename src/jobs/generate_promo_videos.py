@@ -101,7 +101,7 @@ def generate_all() -> None:
         output_path = os.path.join(OUTPUT_DIR, f"{entry['id']}.mp4")
         tmp_dir = os.path.join(OUTPUT_DIR, f"_tmp_{entry['id']}")
         print(f"Genero {entry['id']}...")
-        build_promo_video(entry["script"], images[:4], output_path, tmp_dir)
+        build_promo_video(entry["script"], images[:8], output_path, tmp_dir)
         print(f"  + salvato in {output_path}")
 
     conn.close()

@@ -105,6 +105,11 @@ def _caption_clips_timed(word_timings: list):
     return clips
 
 
+# Durata massima per singola immagine prima del prossimo taglio - stile
+# retention-optimized Shorts (tagli rapidi), non slideshow lento.
+MAX_SEGMENT_SECONDS = 2.5
+
+
 def build_promo_video(script_text: str, image_urls: list[str], output_path: str, tmp_dir: str) -> str:
     audio_path = output_path.replace(".mp4", ".mp3")
     word_timings = generate_audio_with_timing(script_text, audio_path)
@@ -112,15 +117,28 @@ def build_promo_video(script_text: str, image_urls: list[str], output_path: str,
     duration = audio.duration
 
     local_images = download_images(image_urls, tmp_dir)
-    n = len(local_images)
-    per_image = duration / n
-    image_clips = [
-        _ken_burns_clip(path, per_image, zoom_in=(i % 2 == 0))
-        for i, path in enumerate(local_images)
-    ]
+    # Numero di segmenti = quanti tagli servono per stare sotto MAX_SEGMENT_SECONDS,
+    # ma mai piu' immagini distinte di quelle disponibili moltiplicate per 2
+    # (oltre le quali ricicleremmo troppo la stessa foto, diventa ripetitivo).
+    import math
+    target_segments = max(len(local_images), math.ceil(duration / MAX_SEGMENT_SECONDS))
+    target_segments = min(target_segments, len(local_images) * 2)
+    per_image = duration / target_segments
+
+    image_clips = []
+    for i in range(target_segments):
+        path = local_images[i % len(local_images)]
+        # alterna zoom-in/zoom-out ogni volta, cosi' anche quando la stessa
+        # immagine si ripete il movimento e' diverso e non sembra uno stallo
+        image_clips.append(_ken_burns_clip(path, per_image, zoom_in=(i % 2 == 0)))
     background = concatenate_videoclips(image_clips).set_duration(duration)
 
     captions = _caption_clips_timed(word_timings)
     final = CompositeVideoClip([background, *captions], size=(TARGET_W, TARGET_H)).set_audio(audio)
-    final.write_videofile(output_path, fps=30, codec="libx264", audio_codec="aac", logger=None)
+    # bitrate esplicito e alto: senza, moviepy/ffmpeg usa un default basso che
+    # comprime pesantemente i bordi netti del testo (causa reale dello sfocato).
+    final.write_videofile(
+        output_path, fps=30, codec="libx264", audio_codec="aac",
+        bitrate="8000k", preset="medium", logger=None,
+    )
     return output_path
