@@ -22,8 +22,10 @@ if not hasattr(PIL.Image, "ANTIALIAS"):
     PIL.Image.ANTIALIAS = PIL.Image.LANCZOS
 
 import requests
+from PIL import ImageFilter
 from moviepy.editor import (
     AudioFileClip,
+    ColorClip,
     CompositeVideoClip,
     ImageClip,
     TextClip,
@@ -33,54 +35,142 @@ from moviepy.editor import (
 from src.tts import generate_audio_with_timing
 
 TARGET_W, TARGET_H = 1080, 1920
-CAPTION_CHUNK_SIZE = 3
-CAPTION_FONTSIZE = 76
+CAPTION_CHUNK_SIZE = 2
+CAPTION_FONTSIZE = 80
 CAPTION_Y = int(TARGET_H * 0.62)
+CAPTION_BAND_Y = int(TARGET_H * 0.56)
+CAPTION_BAND_HEIGHT = int(TARGET_H * 0.22)
+CAPTION_POP_SECONDS = 0.12
+
+# Same bundled font as the other video pipelines (PC Tweaker, Shorts bot) -
+# ImageMagick's Windows build silently falls back to a thin default font
+# (no error) when given a font path with backslashes, so always normalize
+# to forward slashes.
+FONT_PATH = os.path.join(os.path.dirname(__file__), "..", "assets", "fonts", "Poppins-ExtraBold.ttf").replace(os.sep, "/")
 
 
-def download_images(urls: list[str], tmp_dir: str) -> list[str]:
+# Sotto questa risoluzione (lato corto, px) un'immagine prodotto CJ e' quasi
+# certamente troppo piccola per riempire un frame 1080x1920 senza sfocarsi
+# visibilmente - non blocchiamo il render (meglio sfocato che niente), ma
+# segnaliamo cosi' si puo' andare a cercare un'immagine migliore su CJ.
+MIN_SAFE_SHORT_SIDE = 900
+
+# Sopra questo fattore di ingrandimento "obbligato" (solo per riempire il
+# frame, PRIMA di ogni zoom Ken Burns) la sfocatura diventa evidente - da
+# quel punto in poi riduciamo drasticamente lo zoom aggiuntivo invece di
+# sommarci sopra altro ingrandimento.
+SAFE_UPSCALE_FACTOR = 1.3
+
+
+def download_images(urls: list[str], tmp_dir: str) -> list[tuple[str, int, int]]:
+    """Scarica le immagini e ritorna (path, width, height) di ciascuna, ordinate
+    per risoluzione decrescente - cosi' le immagini piu' nitide vengono usate
+    per prime/piu' spesso quando servono piu' segmenti delle immagini disponibili."""
     os.makedirs(tmp_dir, exist_ok=True)
-    paths = []
+    results = []
     for i, url in enumerate(urls):
         path = os.path.join(tmp_dir, f"img_{i}.jpg")
         resp = requests.get(url, timeout=30)
         resp.raise_for_status()
         with open(path, "wb") as f:
             f.write(resp.content)
-        paths.append(path)
-    return paths
+        with PIL.Image.open(path) as im:
+            w, h = im.size
+        results.append((path, w, h))
+
+    results.sort(key=lambda r: r[1] * r[2], reverse=True)
+
+    best_short_side = min(results[0][1], results[0][2]) if results else 0
+    if best_short_side < MIN_SAFE_SHORT_SIDE:
+        print(
+            f"  [WARN] anche la migliore immagine disponibile e' solo "
+            f"{results[0][1]}x{results[0][2]}px - sotto la soglia di "
+            f"{MIN_SAFE_SHORT_SIDE}px, il video rischia di uscire visibilmente "
+            f"sfocato. Cerca un'immagine piu' risoluta su CJ per questo prodotto."
+        )
+    return results
 
 
-def _ken_burns_clip(image_path: str, duration: float, zoom_in: bool = True) -> ImageClip:
-    clip = ImageClip(image_path)
-    # riempi il frame verticale (cover-crop) prima di applicare lo zoom
-    if clip.w / clip.h > TARGET_W / TARGET_H:
-        clip = clip.resize(height=TARGET_H)
+def _make_blurred_background(image_path: str, tmp_dir: str) -> str:
+    """Cover-crops + heavily blurs the product photo to fill the frame as a
+    backdrop. Confirmed live (2026-07-30) that real CJ product photos come
+    back as small as 600x600 - a plain cover-crop into 1080x1920 forces a
+    3.2x+ upscale before any Ken Burns zoom even runs, which is visibly
+    blurry regardless of video bitrate (that's a source-resolution problem,
+    not an encoding one - capping the zoom alone doesn't fix it). Real
+    product-ad creators solve exactly this with a blurred full-bleed
+    backdrop (intentional softness) behind a sharp, never-overscaled
+    product cutout - see _ken_burns_clip, which layers this behind that."""
+    img = PIL.Image.open(image_path).convert("RGB")
+    if img.width / img.height > TARGET_W / TARGET_H:
+        new_h, new_w = TARGET_H, int(img.width * (TARGET_H / img.height))
     else:
-        clip = clip.resize(width=TARGET_W)
-    clip = clip.crop(x_center=clip.w / 2, y_center=clip.h / 2, width=TARGET_W, height=TARGET_H)
+        new_w, new_h = TARGET_W, int(img.height * (TARGET_W / img.width))
+    img = img.resize((new_w, new_h), PIL.Image.LANCZOS)
+    left, top = (new_w - TARGET_W) // 2, (new_h - TARGET_H) // 2
+    img = img.crop((left, top, left + TARGET_W, top + TARGET_H))
+    img = img.filter(ImageFilter.GaussianBlur(radius=40))
+    img = PIL.Image.eval(img, lambda p: int(p * 0.55))  # darken so white captions stay readable
 
-    start_scale, end_scale = (1.0, 1.15) if zoom_in else (1.15, 1.0)
+    out_path = os.path.join(tmp_dir, f"bg_{os.path.basename(image_path)}")
+    img.save(out_path, quality=85)
+    return out_path
+
+
+def _ken_burns_clip(image_path: str, img_w: int, img_h: int, duration: float, tmp_dir: str, zoom_in: bool = True) -> ImageClip:
+    bg_path = _make_blurred_background(image_path, tmp_dir)
+    background = ImageClip(bg_path).set_duration(duration)
+
+    # Sharp foreground: fit-to-frame WITHOUT upscaling past native
+    # resolution (capped at 1.0), unlike the old cover-crop that forced a
+    # 3.2x+ upscale on small source photos - a 600x600 product shows at
+    # true native size (letterboxed, backed by the blurred full-bleed
+    # layer) instead of being stretched into visible mush.
+    fit_scale = min(TARGET_W / img_w, TARGET_H / img_h, 1.0)
+    product = ImageClip(image_path).resize(fit_scale)
+
+    # Ken Burns zoom on top of fit_scale, capped so the TOTAL scale (fit *
+    # zoom) never crosses SAFE_UPSCALE_FACTOR past native resolution -
+    # small images get a near-static frame (little zoom headroom left),
+    # already-large images still get a normal Ken Burns pan/zoom.
+    max_total_scale = min(SAFE_UPSCALE_FACTOR / max(fit_scale, 0.01), 1.15)
+    start_scale, end_scale = (1.0, max_total_scale) if zoom_in else (max_total_scale, 1.0)
 
     def scale_at(t):
         progress = t / duration
         return start_scale + (end_scale - start_scale) * progress
 
-    zoomed = clip.resize(lambda t: scale_at(t)).set_position(("center", "center"))
-    return CompositeVideoClip([zoomed], size=(TARGET_W, TARGET_H)).set_duration(duration)
+    zoomed_product = product.resize(lambda t: scale_at(t)).set_position(("center", "center"))
+    return CompositeVideoClip([background, zoomed_product], size=(TARGET_W, TARGET_H)).set_duration(duration)
 
 
 def _make_caption_clip(text: str, start: float, duration: float):
-    return (
-        TextClip(
-            text, fontsize=CAPTION_FONTSIZE, color="white", stroke_color="black",
-            stroke_width=4, method="caption", size=(TARGET_W - 100, None),
-            font="DejaVu-Sans-Bold",
-        )
+    duration = max(duration, 0.1)
+    pop = min(CAPTION_POP_SECONDS, duration / 2)
+
+    def _pop_scale(t, pop=pop):
+        return 1.0 if t >= pop else 0.85 + 0.15 * (t / pop)
+
+    # ImageMagick's combined -fill + -stroke on a single "caption:" (Pango)
+    # pass is unreliable on this machine's IM build - confirmed live
+    # (2026-07-30) it intermittently renders outline-only with ZERO fill,
+    # reproducible even in total isolation with no code change between
+    # runs (same exact command, same text, flaky pass-to-pass). Splitting
+    # into two separate TextClips - a solid stroke-color block underneath,
+    # a plain white fill with no stroke on top - avoids the buggy combined
+    # code path entirely and has been reliable across repeated tests.
+    common = dict(fontsize=CAPTION_FONTSIZE, method="caption", size=(TARGET_W - 100, None), font=FONT_PATH)
+    stroke_layer = TextClip(text, color="black", stroke_color="black", stroke_width=6, **common)
+    fill_layer = TextClip(text, color="white", **common)
+
+    clip = (
+        CompositeVideoClip([stroke_layer, fill_layer.set_position(("center", "center"))], size=stroke_layer.size)
         .set_start(start)
-        .set_duration(max(duration, 0.1))
+        .set_duration(duration)
+        .resize(_pop_scale)
         .set_position(("center", CAPTION_Y))
     )
+    return clip
 
 
 def _caption_clips_timed(word_timings: list):
@@ -127,14 +217,30 @@ def build_promo_video(script_text: str, image_urls: list[str], output_path: str,
 
     image_clips = []
     for i in range(target_segments):
-        path = local_images[i % len(local_images)]
+        # local_images e' gia' ordinata per risoluzione decrescente
+        # (download_images): quando servono piu' segmenti delle immagini
+        # disponibili, si ricicla ripartendo dalle piu' nitide.
+        path, img_w, img_h = local_images[i % len(local_images)]
         # alterna zoom-in/zoom-out ogni volta, cosi' anche quando la stessa
         # immagine si ripete il movimento e' diverso e non sembra uno stallo
-        image_clips.append(_ken_burns_clip(path, per_image, zoom_in=(i % 2 == 0)))
+        image_clips.append(_ken_burns_clip(path, img_w, img_h, per_image, tmp_dir, zoom_in=(i % 2 == 0)))
     background = concatenate_videoclips(image_clips).set_duration(duration)
 
+    # Product photos on CJ are almost always plain white-background cutouts
+    # (confirmed live 2026-07-30) - white caption text with only a black
+    # stroke silently loses its fill's contrast whenever it lands over that
+    # white area (the fill blends in, only the outline stays visible). A
+    # semi-transparent dark band behind the captions guarantees contrast
+    # regardless of what's behind them, same fix already used in the
+    # sibling video pipelines (PC Tweaker, Shorts bot).
+    band = (
+        ColorClip(size=(TARGET_W, CAPTION_BAND_HEIGHT), color=(0, 0, 0))
+        .set_opacity(0.45)
+        .set_duration(duration)
+        .set_position(("center", CAPTION_BAND_Y))
+    )
     captions = _caption_clips_timed(word_timings)
-    final = CompositeVideoClip([background, *captions], size=(TARGET_W, TARGET_H)).set_audio(audio)
+    final = CompositeVideoClip([background, band, *captions], size=(TARGET_W, TARGET_H)).set_audio(audio)
     # bitrate esplicito e alto: senza, moviepy/ffmpeg usa un default basso che
     # comprime pesantemente i bordi netti del testo (causa reale dello sfocato).
     final.write_videofile(

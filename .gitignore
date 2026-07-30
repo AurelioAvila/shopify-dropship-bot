@@ -5,3 +5,5 @@ __pycache__/
 venv/
 *.log
 data/*.db
+data/promo_videos/_tmp_*/
+*TEMP_MPY*
