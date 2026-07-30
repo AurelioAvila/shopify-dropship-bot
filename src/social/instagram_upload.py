@@ -53,6 +53,15 @@ def upload_reel(brand: str, video_url: str, caption: str) -> str:
     return post_id
 
 
+def delete_media(brand: str, media_id: str) -> None:
+    access_token = os.environ[f"INSTAGRAM_{brand}_ACCESS_TOKEN"]
+    resp = requests.delete(
+        f"{API_BASE}/{media_id}", headers={"Authorization": f"Bearer {access_token}"}
+    )
+    resp.raise_for_status()
+    print(f"[OK] [{brand}] Rimosso post {media_id}")
+
+
 def _poll_container_status(creation_id: str, headers: dict, timeout: int = 300) -> str:
     deadline = time.time() + timeout
     while time.time() < deadline:

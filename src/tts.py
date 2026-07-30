@@ -8,14 +8,18 @@ import time
 
 import edge_tts
 
-DEFAULT_VOICE = "it-IT-DiegoNeural"
+DEFAULT_VOICE = "en-US-GuyNeural"
 DEFAULT_RATE = "+0%"
 MAX_RETRIES = 3
 RETRY_DELAY_SECONDS = 5
 
 
 async def _generate_with_timing(text: str, output_path: str, voice: str, rate: str) -> list:
-    communicate = edge_tts.Communicate(text, voice, rate=rate)
+    # boundary="WordBoundary" e' necessario esplicitamente: il default e'
+    # "SentenceBoundary", che non emette eventi WordBoundary, quindi senza
+    # questo i sottotitoli sincronizzati non sono mai generati (fallback
+    # silenzioso a nessun sottotitolo, non a un errore visibile).
+    communicate = edge_tts.Communicate(text, voice, rate=rate, boundary="WordBoundary")
     word_timings = []
     with open(output_path, "wb") as f:
         async for chunk in communicate.stream():

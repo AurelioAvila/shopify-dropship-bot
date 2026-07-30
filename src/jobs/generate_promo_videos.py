@@ -20,61 +20,61 @@ SCRIPTS = [
         "id": "1_nail_clipper_satisfying",
         "product_title_match": "Nail Clipper",
         "script": (
-            "Il mio cane odiava il taglio delle unghie. "
-            "Poi ho provato questo. "
-            "Presa sicura, taglio netto, zero stress. "
-            "Guarda il risultato."
+            "My dog used to hate nail trims. "
+            "Then I tried this. "
+            "Secure grip, clean cut, zero stress. "
+            "Look at the result."
         ),
     },
     {
         "id": "2_nail_trimmer_mythbust",
         "product_title_match": "Nail Trimmer",
         "script": (
-            "Se il tuo cane scappa ogni volta che tiri fuori le forbici, "
-            "probabilmente stai sbagliando la presa. "
-            "Ecco il trucco: tieni la zampa cosi', "
-            "taglia solo la punta bianca, mai il rosa. "
-            "Fatto, in trenta secondi, senza stress per nessuno dei due."
+            "If your dog runs away every time you pull out the clippers, "
+            "you're probably holding it wrong. "
+            "Here's the trick: hold the paw like this, "
+            "only cut the white tip, never the pink. "
+            "Done, in thirty seconds, stress-free for both of you."
         ),
     },
     {
         "id": "3_grooming_table",
         "product_title_match": "Grooming Table",
         "script": (
-            "Se hai piu' di un cane, sai il caos di toelettarli su un tavolo normale. "
-            "Questo cambia tutto: altezza regolabile, "
-            "superficie antiscivolo, guinzaglio integrato. "
-            "Tre cani, un pomeriggio, zero stress."
+            "If you have more than one dog, you know the chaos of grooming them on a normal table. "
+            "This changes everything: adjustable height, "
+            "non-slip surface, built-in leash arm. "
+            "Three dogs, one afternoon, zero stress."
         ),
     },
     {
         "id": "4_magsafe_wallet_stresstest",
         "product_title_match": "Magsafe Magnetic Luxury",
         "script": (
-            "Ti fidi davvero della calamita di questi portafogli magsafe? "
-            "Io l'ho scosso, capovolto, e portato in tasca tutto il giorno. "
-            "Non si e' staccato mai. "
-            "Ecco perche' vale la spesa in piu' rispetto a uno normale."
+            "Do you actually trust the magnet on these MagSafe wallets? "
+            "I shook it, flipped it upside down, and carried it in my pocket all day. "
+            "It never fell off. "
+            "That's why it's worth the extra couple of euros over a regular case."
         ),
     },
     {
         "id": "5_car_mount_comparison",
         "product_title_match": "Dashboard Car Phone Holder Mount Magnetic Stainless Steel",
         "script": (
-            "La differenza tra un supporto auto economico e uno buono "
-            "si vede solo quando e' troppo tardi, "
-            "cioe' quando il telefono ti cade mentre guidi. "
-            "Rotazione fluida, presa in acciaio, resistente all'acqua."
+            "The difference between a cheap car mount and a good one "
+            "only shows up when it's too late, "
+            "meaning when your phone drops while you're driving. "
+            "Smooth rotation, steel grip, water resistant."
         ),
     },
     {
         "id": "6_car_mount_pov",
         "product_title_match": "Magnetic Bendable Car Mobile Phone Holder",
         "script": (
-            "Pov: hai sempre il telefono che scivola nel portabicchieri "
-            "mentre segui il navigatore. "
-            "Installazione in cinque secondi. "
-            "Fatto. Non lo stacco piu'."
+            "POV: your phone keeps sliding in the cup holder "
+            "while you're following the GPS. "
+            "Five second install. "
+            "Done. Never taking it off."
         ),
     },
 ]

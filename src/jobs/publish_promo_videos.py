@@ -24,32 +24,32 @@ TECH_BRAND = "MAGDOCK"
 VIDEOS = {
     "1_nail_clipper_satisfying": {
         "brand": PET_BRAND,
-        "caption": "Il mio cane odiava il taglio unghie, finche' non ho trovato questo 🐾 "
+        "caption": "My dog used to hate nail trims, until I found this 🐾 "
                     "#dogsoftiktok #petcare #satisfying",
     },
     "2_nail_trimmer_mythbust": {
         "brand": PET_BRAND,
-        "caption": "L'errore che (quasi) tutti fanno quando tagliano le unghie al cane 🐶 "
+        "caption": "The mistake almost everyone makes when trimming their dog's nails 🐶 "
                     "#doggrooming #pettips #dogtok",
     },
     "3_grooming_table": {
         "brand": PET_BRAND,
-        "caption": "Toelettare piu' cani non deve essere un caos 🐕 "
+        "caption": "Grooming multiple dogs doesn't have to be chaos 🐕 "
                     "#doggrooming #multidog #petcare",
     },
     "4_magsafe_wallet_stresstest": {
         "brand": TECH_BRAND,
-        "caption": "Ho stress-testato il case MagSafe cosi' non devi farlo tu 📱 "
+        "caption": "I stress-tested this MagSafe case so you don't have to 📱 "
                     "#magsafe #phoneaccessories #techtok",
     },
     "5_car_mount_comparison": {
         "brand": TECH_BRAND,
-        "caption": "La differenza si vede solo quando e' troppo tardi 🚗 "
+        "caption": "The difference only shows up when it's too late 🚗 "
                     "#carmount #phonemount #techtok",
     },
     "6_car_mount_pov": {
         "brand": TECH_BRAND,
-        "caption": "POV: non ti cade piu' il telefono in auto 📱🚗 "
+        "caption": "POV: your phone never drops in the car again 📱🚗 "
                     "#caraccessories #lifehack #fyp",
     },
 }
