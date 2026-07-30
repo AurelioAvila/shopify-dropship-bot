@@ -6,6 +6,13 @@ Stessa impostazione visiva (font, stroke, banda sottotitoli) del bot Shorts.
 """
 import os
 
+# Windows ha un convert.exe di sistema (System32) che non c'entra con
+# ImageMagick e confonde moviepy se non gli si punta esplicitamente al
+# binario giusto - deve essere impostato PRIMA di importare moviepy.editor.
+_IMAGEMAGICK_BINARY = r"C:\Program Files\ImageMagick-7.1.2-Q16-HDRI\magick.exe"
+if os.path.exists(_IMAGEMAGICK_BINARY):
+    os.environ["IMAGEMAGICK_BINARY"] = _IMAGEMAGICK_BINARY
+
 import PIL.Image
 
 # Pillow >=10 ha rimosso Image.ANTIALIAS (deprecato in favore di Resampling.LANCZOS);
