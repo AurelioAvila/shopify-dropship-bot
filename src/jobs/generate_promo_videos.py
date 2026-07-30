@@ -77,6 +77,27 @@ SCRIPTS = [
             "Done. Never taking it off."
         ),
     },
+    {
+        "id": "7_puzzle_feeder_boredom",
+        "product_title_match": "Adjustable Treat Dispenser Toy For Dogs",
+        "script": (
+            "If your dog destroys everything when you leave the house, "
+            "it's probably not bad behavior, it's boredom. "
+            "This puzzle feeder makes them work for every treat, "
+            "adjustable difficulty as they get smarter. "
+            "Tired mind, calm dog, furniture still in one piece."
+        ),
+    },
+    {
+        "id": "8_wireless_charger_stand",
+        "product_title_match": "Plastic 3 In 1 Wireless Charger Stand",
+        "script": (
+            "Three devices, three cables, one messy desk. "
+            "This charges your phone, your watch, and your earbuds "
+            "at the same time, no cables in sight. "
+            "One clean setup instead of a tangled mess every night."
+        ),
+    },
 ]
 
 

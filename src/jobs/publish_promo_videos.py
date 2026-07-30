@@ -56,6 +56,16 @@ VIDEOS = {
         "caption": f"POV: your phone never drops in the car again 📱🚗 {_CTA} "
                     "#caraccessories #lifehack #fyp",
     },
+    "7_puzzle_feeder_boredom": {
+        "brand": PET_BRAND,
+        "caption": f"It's not bad behavior, it's boredom 🐾 {_CTA} "
+                    "#dogenrichment #puppytraining #dogtok",
+    },
+    "8_wireless_charger_stand": {
+        "brand": TECH_BRAND,
+        "caption": f"One clean charging setup instead of a cable mess 📱⌚ {_CTA} "
+                    "#deskaesthetic #techtok #wirelesscharging",
+    },
 }
 
 
