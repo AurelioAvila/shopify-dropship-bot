@@ -62,10 +62,23 @@ MIN_SAFE_SHORT_SIDE = 900
 SAFE_UPSCALE_FACTOR = 1.3
 
 
+class LowResolutionError(Exception):
+    """Nessuna immagine del prodotto e' abbastanza nitida da garantire lo
+    stesso standard qualitativo delle altre pipeline (CertSprint/PC Tweaker
+    usano footage stock sempre ad alta risoluzione, quindi non hanno questo
+    problema) - il chiamante deve saltare il prodotto invece di pubblicare
+    un video visibilmente sfocato."""
+
+
 def download_images(urls: list[str], tmp_dir: str) -> list[tuple[str, int, int]]:
     """Scarica le immagini e ritorna (path, width, height) di ciascuna, ordinate
     per risoluzione decrescente - cosi' le immagini piu' nitide vengono usate
-    per prime/piu' spesso quando servono piu' segmenti delle immagini disponibili."""
+    per prime/piu' spesso quando servono piu' segmenti delle immagini disponibili.
+
+    Filtro rigido (non solo un warning): se anche la migliore immagine
+    disponibile e' sotto MIN_SAFE_SHORT_SIDE, solleva LowResolutionError
+    invece di procedere - meglio saltare il prodotto che pubblicare un
+    Reel sotto lo standard qualitativo degli altri account."""
     os.makedirs(tmp_dir, exist_ok=True)
     results = []
     for i, url in enumerate(urls):
@@ -82,11 +95,10 @@ def download_images(urls: list[str], tmp_dir: str) -> list[tuple[str, int, int]]
 
     best_short_side = min(results[0][1], results[0][2]) if results else 0
     if best_short_side < MIN_SAFE_SHORT_SIDE:
-        print(
-            f"  [WARN] anche la migliore immagine disponibile e' solo "
+        raise LowResolutionError(
+            f"anche la migliore immagine disponibile e' solo "
             f"{results[0][1]}x{results[0][2]}px - sotto la soglia di "
-            f"{MIN_SAFE_SHORT_SIDE}px, il video rischia di uscire visibilmente "
-            f"sfocato. Cerca un'immagine piu' risoluta su CJ per questo prodotto."
+            f"{MIN_SAFE_SHORT_SIDE}px, il video uscirebbe visibilmente sfocato."
         )
     return results
 
