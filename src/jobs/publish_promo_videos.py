@@ -12,7 +12,8 @@ import os
 
 from src.clients.shopify_client import ShopifyClient
 from src.social.instagram_upload import upload_reel
-from src.social.tiktok_upload import upload_video
+from src.social.tiktok_upload import upload_video_to_inbox
+from src.social.youtube_upload import upload_video as upload_youtube_video
 
 OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data", "promo_videos")
 
@@ -69,7 +70,7 @@ VIDEOS = {
 }
 
 
-def publish_all(only: str | None = None, skip_tiktok: bool = False, skip_instagram: bool = False) -> None:
+def publish_all(only: str | None = None, skip_tiktok: bool = False, skip_instagram: bool = False, skip_youtube: bool = False) -> None:
     shopify = ShopifyClient()
 
     items = {only: VIDEOS[only]} if only else VIDEOS
@@ -85,11 +86,17 @@ def publish_all(only: str | None = None, skip_tiktok: bool = False, skip_instagr
 
         if not skip_tiktok:
             try:
-                # SELF_ONLY finche' l'app non supera l'audit "Direct Post" di
-                # TikTok - PUBLIC_TO_EVERYONE fallirebbe con 403
-                # unaudited_client_can_only_post_to_private_accounts finche'
-                # l'account resta privato (obbligatorio pre-audit).
-                upload_video(brand, video_path, caption, privacy_level="SELF_ONLY")
+                # In attesa dell'audit "Direct Post" di TikTok mandiamo il
+                # video nelle bozze ("Upload to TikTok") invece di pubblicarlo
+                # direttamente - funziona gia' oggi, senza restrizioni di
+                # privacy_level, ma quell'endpoint non accetta una caption via
+                # API: la salviamo in un .txt accanto al video cosi' il brand
+                # deve solo copiarla e incollarla quando preme "Pubblica".
+                upload_video_to_inbox(brand, video_path)
+                caption_path = os.path.join(OUTPUT_DIR, f"{video_id}_tiktok_caption.txt")
+                with open(caption_path, "w", encoding="utf-8") as f:
+                    f.write(caption)
+                print(f"  > caption pronta da incollare: {caption_path}")
             except Exception as exc:
                 print(f"  ! {video_id}: errore pubblicazione TikTok: {exc}")
 
@@ -100,15 +107,24 @@ def publish_all(only: str | None = None, skip_tiktok: bool = False, skip_instagr
             except Exception as exc:
                 print(f"  ! {video_id}: errore pubblicazione Instagram: {exc}")
 
+        if not skip_youtube:
+            try:
+                yt_title = f"{caption.split('—')[0].strip()} #shorts"
+                upload_youtube_video(brand, video_path, yt_title, caption)
+            except Exception as exc:
+                print(f"  ! {video_id}: errore pubblicazione YouTube: {exc}")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--video", default=None, help="Pubblica solo questo video (id senza .mp4)")
     parser.add_argument("--only-tiktok", action="store_true")
     parser.add_argument("--only-instagram", action="store_true")
+    parser.add_argument("--skip-youtube", action="store_true")
     args = parser.parse_args()
     publish_all(
         only=args.video,
         skip_tiktok=args.only_instagram,
         skip_instagram=args.only_tiktok,
+        skip_youtube=args.only_tiktok or args.skip_youtube,
     )
