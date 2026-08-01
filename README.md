@@ -20,6 +20,16 @@ principali di AutoDS: import prodotti, sync prezzo/stock, evasione ordini automa
      (vedi prerequisiti nel file stesso - serve un'app su developers.tiktok.com).
    - `INSTAGRAM_{BRAND}_*`: access token di lunga durata + ID account Instagram
      Business, generati da https://developers.facebook.com/ (Meta for Developers).
+   - `X_{BRAND}_API_KEY` / `X_{BRAND}_API_SECRET` / `X_{BRAND}_ACCESS_TOKEN` /
+     `X_{BRAND}_ACCESS_TOKEN_SECRET` (opzionale, `BRAND` = `GROOMLYCO` o
+     `MAGDOCK`): da [developer.x.com](https://developer.x.com), accedi con
+     l'account X del brand, crea Project + App, User authentication ->
+     OAuth 1.0a, permessi **Read and Write**, poi genera le 4 chiavi
+     (rigenera l'Access Token *dopo* aver messo Read+Write). Piano free:
+     posta solo testo/link (niente video/immagini, serve il piano Basic a
+     pagamento per quello), 500 post/mese/app - piu' che sufficiente.
+     Senza queste variabili, `publish_promo_videos.py` salta il post su X
+     senza errori.
 
 ## Uso
 

@@ -14,6 +14,7 @@ from src.clients.shopify_client import ShopifyClient
 from src.social.instagram_upload import upload_reel
 from src.social.tiktok_upload import upload_video_to_inbox
 from src.social.youtube_upload import upload_video as upload_youtube_video
+from src.social.x_upload import post_tweet
 
 OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data", "promo_videos")
 
@@ -70,7 +71,7 @@ VIDEOS = {
 }
 
 
-def publish_all(only: str | None = None, skip_tiktok: bool = False, skip_instagram: bool = False, skip_youtube: bool = False) -> None:
+def publish_all(only: str | None = None, skip_tiktok: bool = False, skip_instagram: bool = False, skip_youtube: bool = False, skip_x: bool = False) -> None:
     shopify = ShopifyClient()
 
     items = {only: VIDEOS[only]} if only else VIDEOS
@@ -114,6 +115,15 @@ def publish_all(only: str | None = None, skip_tiktok: bool = False, skip_instagr
             except Exception as exc:
                 print(f"  ! {video_id}: errore pubblicazione YouTube: {exc}")
 
+        if not skip_x:
+            try:
+                # Solo testo (free tier X API, niente media) - vedi
+                # src/social/x_upload.py per il perche'. Salta da solo se
+                # le credenziali X_{brand}_API_* non sono impostate.
+                post_tweet(brand, caption)
+            except Exception as exc:
+                print(f"  ! {video_id}: errore pubblicazione X: {exc}")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -121,10 +131,12 @@ if __name__ == "__main__":
     parser.add_argument("--only-tiktok", action="store_true")
     parser.add_argument("--only-instagram", action="store_true")
     parser.add_argument("--skip-youtube", action="store_true")
+    parser.add_argument("--skip-x", action="store_true")
     args = parser.parse_args()
     publish_all(
         only=args.video,
         skip_tiktok=args.only_instagram,
         skip_instagram=args.only_tiktok,
         skip_youtube=args.only_tiktok or args.skip_youtube,
+        skip_x=args.only_tiktok or args.skip_x,
     )

@@ -1,0 +1,60 @@
+"""
+Pubblica un video su YouTube per un brand specifico (Groomlyco o Magdock),
+ognuno con le proprie credenziali - stesso principio multi-brand gia' usato
+in tiktok_upload.py.
+
+Credenziali lette da: YOUTUBE_{BRAND}_CLIENT_ID, YOUTUBE_{BRAND}_CLIENT_SECRET,
+YOUTUBE_{BRAND}_REFRESH_TOKEN (es. YOUTUBE_GROOMLYCO_CLIENT_ID), generate con
+get_youtube_token.py --brand groomlyco (nella root del repo).
+"""
+import os
+
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaFileUpload
+
+CATEGORY_IDS = {
+    "GROOMLYCO": "26",  # Howto & Style (pet care)
+    "MAGDOCK": "26",    # Howto & Style (tech accessories)
+}
+
+
+def _get_authenticated_service(brand: str):
+    creds = Credentials(
+        token=None,
+        refresh_token=os.environ[f"YOUTUBE_{brand}_REFRESH_TOKEN"],
+        token_uri="https://oauth2.googleapis.com/token",
+        client_id=os.environ[f"YOUTUBE_{brand}_CLIENT_ID"],
+        client_secret=os.environ[f"YOUTUBE_{brand}_CLIENT_SECRET"],
+        scopes=["https://www.googleapis.com/auth/youtube.upload"],
+    )
+    return build("youtube", "v3", credentials=creds)
+
+
+def upload_video(brand: str, video_path: str, title: str, description: str, tags: list = None) -> str:
+    youtube = _get_authenticated_service(brand)
+
+    body = {
+        "snippet": {
+            "title": title[:100],
+            "description": description,
+            "tags": tags or [],
+            "categoryId": CATEGORY_IDS.get(brand, "26"),
+        },
+        "status": {
+            "privacyStatus": "public",
+            "selfDeclaredMadeForKids": False,
+        },
+    }
+
+    media = MediaFileUpload(video_path, chunksize=-1, resumable=True, mimetype="video/mp4")
+    request = youtube.videos().insert(part="snippet,status", body=body, media_body=media)
+
+    response = None
+    while response is None:
+        status, response = request.next_chunk()
+        if status:
+            print(f"  Upload in corso: {int(status.progress() * 100)}%")
+
+    print(f"[OK] [{brand}] Pubblicato su YouTube: video id={response['id']}")
+    return response["id"]
