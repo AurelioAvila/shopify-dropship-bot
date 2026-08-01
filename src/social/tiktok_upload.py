@@ -36,11 +36,18 @@ def _notify_telegram(brand: str, video_path: str, caption: str) -> None:
     if not token or not chat_id:
         return
     video_name = os.path.basename(video_path)
-    text = f"🎬 {brand} — {video_name}\n\n{caption}"
     try:
+        # Due messaggi separati: il primo e' solo un'etichetta (a che account/
+        # video si riferisce), il secondo e' la caption pura, cosi' si puo'
+        # selezionare e incollare direttamente senza dover ripulire nulla.
         requests.post(
             f"https://api.telegram.org/bot{token}/sendMessage",
-            data={"chat_id": chat_id, "text": text},
+            data={"chat_id": chat_id, "text": f"🎬 {brand} — {video_name}"},
+            timeout=15,
+        )
+        requests.post(
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            data={"chat_id": chat_id, "text": caption},
             timeout=15,
         )
     except Exception as exc:
