@@ -76,6 +76,26 @@ def _generate_bg_music(path: str, duration: float) -> None:
     ]
     subprocess.run(cmd, check=True, capture_output=True)
 
+
+def _generate_whoosh(path: str, duration: float = 0.35) -> None:
+    """Whoosh sintetizzato (rumore filtrato con fade) per marcare i tagli tra
+    un'immagine e l'altra - stesso pattern gia' usato per CertSprint. Prima
+    questi video non avevano nessun suono di transizione, solo un taglio
+    secco; un whoosh discreto sui cambi scena e' lo standard di sound design
+    2026 per i tagli in questo tipo di contenuto (ricerca 2026-08-01)."""
+    subprocess.run([
+        "ffmpeg", "-y", "-f", "lavfi",
+        "-i", f"anoisesrc=color=pink:duration={duration}:sample_rate=44100",
+        "-af", (
+            "highpass=f=800,lowpass=f=6000,"
+            "afade=t=in:st=0:d=0.04,"
+            f"afade=t=out:st={duration - 0.12:.3f}:d=0.12,"
+            "volume=0.35"
+        ),
+        str(path),
+    ], check=True, capture_output=True)
+
+
 TARGET_W, TARGET_H = 1080, 1920
 CAPTION_CHUNK_SIZE = 2
 CAPTION_FONTSIZE = 80
@@ -369,7 +389,18 @@ def build_promo_video(script_text: str, image_urls: list[str], output_path: str,
     bg_music_path = output_path.replace(".mp4", "_bgmusic.mp3")
     _generate_bg_music(bg_music_path, duration)
     bg_music = AudioFileClip(bg_music_path)
-    full_audio = CompositeAudioClip([bg_music, audio])
+
+    # Whoosh discreto a ogni cambio immagine (tranne il primo, l'apertura non
+    # ha bisogno di un "taglio" da segnare) - marca il ritmo dei tagli senza
+    # mai coprire la voce (volume basso, dura solo 0.35s).
+    whoosh_path = output_path.replace(".mp4", "_whoosh.wav")
+    _generate_whoosh(whoosh_path)
+    whoosh_layers = [
+        AudioFileClip(whoosh_path).set_start(i * per_image)
+        for i in range(1, target_segments)
+    ]
+
+    full_audio = CompositeAudioClip([bg_music, audio, *whoosh_layers])
 
     final = CompositeVideoClip([background, band, *captions], size=(TARGET_W, TARGET_H)).set_audio(full_audio)
     # bitrate esplicito e alto: senza, moviepy/ffmpeg usa un default basso che
