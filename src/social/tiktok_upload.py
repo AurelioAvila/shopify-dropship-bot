@@ -25,6 +25,28 @@ API_BASE = "https://open.tiktokapis.com/v2"
 TITLE_MAX_LEN = 2200
 
 
+def _notify_telegram(brand: str, video_path: str, caption: str) -> None:
+    """Manda la caption pronta su Telegram appena un video finisce in bozza -
+    l'endpoint bozze di TikTok non accetta una caption via API, quindi senza
+    questo l'utente dovrebbe andare a cercarla a mano sul PC mentre pubblica
+    dal telefono. Silenzioso se le credenziali non sono configurate (non deve
+    mai far fallire l'upload)."""
+    token = os.environ.get("TELEGRAM_BOT_TOKEN")
+    chat_id = os.environ.get("TELEGRAM_CHAT_ID")
+    if not token or not chat_id:
+        return
+    video_name = os.path.basename(video_path)
+    text = f"🎬 {brand} — {video_name}\n\n{caption}"
+    try:
+        requests.post(
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            data={"chat_id": chat_id, "text": text},
+            timeout=15,
+        )
+    except Exception as exc:
+        print(f"[WARN] Notifica Telegram fallita per {video_name}: {exc}")
+
+
 def _get_access_token(brand: str) -> str:
     resp = requests.post(
         f"{API_BASE}/oauth/token/",
@@ -111,7 +133,7 @@ def upload_video(brand: str, video_path: str, caption: str, privacy_level: str =
     return publish_id
 
 
-def upload_video_to_inbox(brand: str, video_path: str) -> str:
+def upload_video_to_inbox(brand: str, video_path: str, caption: str | None = None) -> str:
     """Manda il video nella casella bozze ("Upload to TikTok") del profilo del
     brand, invece di pubblicarlo direttamente - funziona anche prima che
     l'audit "Direct Post" sia approvato, perche' non e' soggetto alle
@@ -153,6 +175,8 @@ def upload_video_to_inbox(brand: str, video_path: str) -> str:
 
     status = _poll_publish_status(access_token, publish_id)
     print(f"[OK] [{brand}] Inviato nelle bozze TikTok: publish_id={publish_id}, stato={status}")
+    if caption:
+        _notify_telegram(brand, video_path, caption)
     return publish_id
 
 

@@ -109,8 +109,9 @@ def run(count: int = 2, skip_tiktok: bool = True, skip_instagram: bool = False, 
                 # bozze ("Upload to TikTok") invece di pubblicarlo
                 # direttamente - funziona gia' oggi senza restrizione
                 # SELF_ONLY. La caption va incollata a mano (l'endpoint
-                # bozze non la accetta via API), la salviamo accanto al video.
-                upload_video_to_inbox(brand, output_path)
+                # bozze non la accetta via API), la salviamo accanto al
+                # video e la mandiamo anche su Telegram per averla sul telefono.
+                upload_video_to_inbox(brand, output_path, caption=caption)
                 caption_path = output_path.replace(".mp4", "_tiktok_caption.txt")
                 with open(caption_path, "w", encoding="utf-8") as f:
                     f.write(caption)

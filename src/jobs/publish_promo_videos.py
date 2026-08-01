@@ -91,9 +91,10 @@ def publish_all(only: str | None = None, skip_tiktok: bool = False, skip_instagr
                 # video nelle bozze ("Upload to TikTok") invece di pubblicarlo
                 # direttamente - funziona gia' oggi, senza restrizioni di
                 # privacy_level, ma quell'endpoint non accetta una caption via
-                # API: la salviamo in un .txt accanto al video cosi' il brand
-                # deve solo copiarla e incollarla quando preme "Pubblica".
-                upload_video_to_inbox(brand, video_path)
+                # API: la salviamo in un .txt accanto al video e la mandiamo
+                # anche su Telegram, cosi' il brand la trova sul telefono
+                # proprio mentre pubblica la bozza dall'app.
+                upload_video_to_inbox(brand, video_path, caption=caption)
                 caption_path = os.path.join(OUTPUT_DIR, f"{video_id}_tiktok_caption.txt")
                 with open(caption_path, "w", encoding="utf-8") as f:
                     f.write(caption)
