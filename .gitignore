@@ -8,3 +8,4 @@ data/*.db
 data/promo_videos/_tmp_*/
 *TEMP_MPY*
 client_secret_*.json
+run_daily_promo.bat
