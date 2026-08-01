@@ -112,7 +112,7 @@ class LowResolutionError(Exception):
     un video visibilmente sfocato."""
 
 
-def download_images(urls: list[str], tmp_dir: str) -> list[tuple[str, int, int]]:
+def download_images(urls: list[str], tmp_dir: str, enforce_min_resolution: bool = True) -> list[tuple[str, int, int]]:
     """Scarica le immagini e ritorna (path, width, height) di ciascuna, ordinate
     per risoluzione decrescente - cosi' le immagini piu' nitide vengono usate
     per prime/piu' spesso quando servono piu' segmenti delle immagini disponibili.
@@ -120,7 +120,19 @@ def download_images(urls: list[str], tmp_dir: str) -> list[tuple[str, int, int]]
     Filtro rigido (non solo un warning): se anche la migliore immagine
     disponibile e' sotto MIN_SAFE_SHORT_SIDE, solleva LowResolutionError
     invece di procedere - meglio saltare il prodotto che pubblicare un
-    Reel sotto lo standard qualitativo degli altri account."""
+    Reel sotto lo standard qualitativo degli altri account.
+
+    enforce_min_resolution=False quando build_promo_video ha gia' uno sfondo
+    VIDEO reale di nicchia disponibile (vedi fetch_niche_background_clips) -
+    in quel caso il prodotto in primo piano non viene MAI ingrandito oltre
+    la sua risoluzione nativa (fit_scale capped a 1.0 in _ken_burns_clip),
+    quindi il rischio di sfocatura che questo filtro esisteva per evitare
+    (il vecchio sfondo-sfocato-della-stessa-foto, ingrandito 3x+) non si
+    applica piu' - tenere il filtro attivo in quel caso scartava inutilmente
+    prodotti validi solo perche' le loro foto erano poco sopra/sotto gli 800px
+    (segnalazione utente 2026-08-01, verificato live su Groomlyco: molti
+    prodotti CJ hanno foto esattamente 800x800, appena sotto la vecchia
+    soglia di 900)."""
     os.makedirs(tmp_dir, exist_ok=True)
     results = []
     for i, url in enumerate(urls):
@@ -136,7 +148,7 @@ def download_images(urls: list[str], tmp_dir: str) -> list[tuple[str, int, int]]
     results.sort(key=lambda r: r[1] * r[2], reverse=True)
 
     best_short_side = min(results[0][1], results[0][2]) if results else 0
-    if best_short_side < MIN_SAFE_SHORT_SIDE:
+    if enforce_min_resolution and best_short_side < MIN_SAFE_SHORT_SIDE:
         raise LowResolutionError(
             f"anche la migliore immagine disponibile e' solo "
             f"{results[0][1]}x{results[0][2]}px - sotto la soglia di "
@@ -312,7 +324,7 @@ def build_promo_video(script_text: str, image_urls: list[str], output_path: str,
     audio = AudioFileClip(audio_path)
     duration = audio.duration
 
-    local_images = download_images(image_urls, tmp_dir)
+    local_images = download_images(image_urls, tmp_dir, enforce_min_resolution=(niche is None))
     # Numero di segmenti = quanti tagli servono per stare sotto MAX_SEGMENT_SECONDS,
     # ma mai piu' immagini distinte di quelle disponibili moltiplicate per 2
     # (oltre le quali ricicleremmo troppo la stessa foto, diventa ripetitivo).
