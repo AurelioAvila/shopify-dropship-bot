@@ -16,6 +16,7 @@ Flusso ufficiale Content Posting API v2:
 NB: finche' l'app non ha superato l'audit "Direct Post" di TikTok, la
 privacy_level effettiva resta SELF_ONLY anche se richiediamo PUBLIC_TO_EVERYONE.
 """
+import json
 import os
 import time
 
@@ -23,6 +24,24 @@ import requests
 
 API_BASE = "https://open.tiktokapis.com/v2"
 TITLE_MAX_LEN = 2200
+
+_COUNTER_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "data", "telegram_notify_counters.json")
+
+
+def _next_counter(brand: str) -> int:
+    """Numero progressivo per brand, cosi' l'etichetta Telegram (es.
+    'GROOMLYCO #7') si puo' abbinare in ordine alle notifiche che arrivano
+    nell'Inbox di TikTok, invece di dover indovinare a quale video si
+    riferisce ciascuna."""
+    counters = {}
+    if os.path.exists(_COUNTER_PATH):
+        with open(_COUNTER_PATH) as f:
+            counters = json.load(f)
+    counters[brand] = counters.get(brand, 0) + 1
+    os.makedirs(os.path.dirname(_COUNTER_PATH), exist_ok=True)
+    with open(_COUNTER_PATH, "w") as f:
+        json.dump(counters, f, indent=2)
+    return counters[brand]
 
 
 def _notify_telegram(brand: str, video_path: str, caption: str) -> None:
@@ -36,13 +55,15 @@ def _notify_telegram(brand: str, video_path: str, caption: str) -> None:
     if not token or not chat_id:
         return
     video_name = os.path.basename(video_path)
+    n = _next_counter(brand)
     try:
         # Due messaggi separati: il primo e' solo un'etichetta (a che account/
-        # video si riferisce), il secondo e' la caption pura, cosi' si puo'
+        # video si riferisce, con numero progressivo per abbinarlo in ordine
+        # alle notifiche TikTok), il secondo e' la caption pura, cosi' si puo'
         # selezionare e incollare direttamente senza dover ripulire nulla.
         requests.post(
             f"https://api.telegram.org/bot{token}/sendMessage",
-            data={"chat_id": chat_id, "text": f"🎬 {brand} — {video_name}"},
+            data={"chat_id": chat_id, "text": f"🎬 {brand} #{n} — {video_name}"},
             timeout=15,
         )
         requests.post(
