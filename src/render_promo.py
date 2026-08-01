@@ -32,10 +32,25 @@ from moviepy.editor import (
     CompositeVideoClip,
     ImageClip,
     TextClip,
+    VideoFileClip,
     concatenate_videoclips,
 )
 
+from src.footage import download_background_video
 from src.tts import generate_audio_with_timing
+
+# Query Pexels per nicchia - usate per lo sfondo VIDEO reale dietro il
+# prodotto (vedi _ken_burns_clip) invece della vecchia foto-prodotto
+# sfocata come unico sfondo, che restava un blob piatto e "sbiadito" a
+# prescindere da quanto si spingesse saturazione/contrasto (segnalazione
+# utente 2026-08-01, verificata visivamente su foto prodotto reali con
+# sfondo bianco da studio - non c'e' nessun dettaglio da recuperare
+# sfocando quel tipo di foto). Stesso principio dei creator veri di
+# product-ad: b-roll di lifestyle reale dietro, prodotto nitido sopra.
+FOOTAGE_QUERIES = {
+    "PET": ["dog playing home", "puppy owner lifestyle", "dog grooming", "pet care home"],
+    "TECH": ["phone accessories desk", "smartphone lifestyle", "tech desk setup", "car dashboard phone"],
+}
 
 
 def _generate_bg_music(path: str, duration: float) -> None:
@@ -169,9 +184,48 @@ def _make_blurred_background(image_path: str, tmp_dir: str) -> str:
     return out_path
 
 
-def _ken_burns_clip(image_path: str, img_w: int, img_h: int, duration: float, tmp_dir: str, zoom_in: bool = True) -> ImageClip:
-    bg_path = _make_blurred_background(image_path, tmp_dir)
-    background = ImageClip(bg_path).set_duration(duration)
+def _fit_vertical(clip: VideoFileClip) -> VideoFileClip:
+    target_ratio = TARGET_W / TARGET_H
+    if clip.w / clip.h > target_ratio:
+        clip = clip.resize(height=TARGET_H)
+    else:
+        clip = clip.resize(width=TARGET_W)
+    return clip.crop(x_center=clip.w / 2, y_center=clip.h / 2, width=TARGET_W, height=TARGET_H)
+
+
+def _loop_to_duration(clip: VideoFileClip, duration: float) -> VideoFileClip:
+    if clip.duration >= duration:
+        return clip.subclip(0, duration)
+    n_loops = int(duration // clip.duration) + 1
+    return concatenate_videoclips([clip] * n_loops).subclip(0, duration)
+
+
+def fetch_niche_background_clips(niche: str, count: int, tmp_dir: str) -> list:
+    """Scarica 'count' clip Pexels vere per la nicchia (PET/TECH), cicliche
+    tra le query disponibili - stesso pattern multi-clip gia' usato in
+    CertSprint/PC Tweaker. Ritorna [] (non solleva) se Pexels fallisce, cosi'
+    il chiamante puo' ricadere sul vecchio sfondo sfumato invece di bloccare
+    l'intera pubblicazione per un problema di rete/quota su una risorsa
+    puramente estetica."""
+    pool = FOOTAGE_QUERIES.get(niche, FOOTAGE_QUERIES["TECH"])
+    paths = []
+    for i in range(count):
+        query = pool[i % len(pool)]
+        path = os.path.join(tmp_dir, f"bgvideo_{i}.mp4")
+        try:
+            download_background_video(path, query=query)
+            paths.append(path)
+        except Exception as exc:
+            print(f"  [WARN] sfondo video Pexels non disponibile ('{query}': {exc}), uso il fallback sfumato per questo segmento")
+    return paths
+
+
+def _ken_burns_clip(image_path: str, img_w: int, img_h: int, duration: float, tmp_dir: str, zoom_in: bool = True, bg_video_path: str = None) -> ImageClip:
+    if bg_video_path:
+        background = _loop_to_duration(_fit_vertical(VideoFileClip(bg_video_path)), duration)
+    else:
+        bg_path = _make_blurred_background(image_path, tmp_dir)
+        background = ImageClip(bg_path).set_duration(duration)
 
     # Sharp foreground: fit-to-frame WITHOUT upscaling past native
     # resolution (capped at 1.0), unlike the old cover-crop that forced a
@@ -252,7 +306,7 @@ def _caption_clips_timed(word_timings: list):
 MAX_SEGMENT_SECONDS = 2.5
 
 
-def build_promo_video(script_text: str, image_urls: list[str], output_path: str, tmp_dir: str) -> str:
+def build_promo_video(script_text: str, image_urls: list[str], output_path: str, tmp_dir: str, niche: str = None) -> str:
     audio_path = output_path.replace(".mp4", ".mp3")
     word_timings = generate_audio_with_timing(script_text, audio_path)
     audio = AudioFileClip(audio_path)
@@ -267,15 +321,22 @@ def build_promo_video(script_text: str, image_urls: list[str], output_path: str,
     target_segments = min(target_segments, len(local_images) * 2)
     per_image = duration / target_segments
 
+    # Sfondi VIDEO reali (b-roll di nicchia) invece della foto prodotto
+    # sfocata - vedi FOOTAGE_QUERIES/fetch_niche_background_clips. Se Pexels
+    # non e' disponibile per qualche motivo, bg_clips resta vuota e
+    # _ken_burns_clip ricade da solo sul vecchio sfondo sfumato.
+    bg_clips = fetch_niche_background_clips(niche, target_segments, tmp_dir) if niche else []
+
     image_clips = []
     for i in range(target_segments):
         # local_images e' gia' ordinata per risoluzione decrescente
         # (download_images): quando servono piu' segmenti delle immagini
         # disponibili, si ricicla ripartendo dalle piu' nitide.
         path, img_w, img_h = local_images[i % len(local_images)]
+        bg_video_path = bg_clips[i % len(bg_clips)] if bg_clips else None
         # alterna zoom-in/zoom-out ogni volta, cosi' anche quando la stessa
         # immagine si ripete il movimento e' diverso e non sembra uno stallo
-        image_clips.append(_ken_burns_clip(path, img_w, img_h, per_image, tmp_dir, zoom_in=(i % 2 == 0)))
+        image_clips.append(_ken_burns_clip(path, img_w, img_h, per_image, tmp_dir, zoom_in=(i % 2 == 0), bg_video_path=bg_video_path))
     background = concatenate_videoclips(image_clips).set_duration(duration)
 
     # Product photos on CJ are almost always plain white-background cutouts

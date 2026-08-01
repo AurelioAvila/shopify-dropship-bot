@@ -89,7 +89,7 @@ def run(count: int = 2, skip_tiktok: bool = True, skip_instagram: bool = False, 
 
         print(f"[{brand}] Genero video per '{title}' ({pid})...")
         try:
-            build_promo_video(script, images[:8], output_path, tmp_dir)
+            build_promo_video(script, images[:8], output_path, tmp_dir, niche=niche)
         except LowResolutionError as exc:
             # Standing quality bar (2026-08-01): mai pubblicare un Reel
             # visibilmente sfocato solo per rispettare la quota giornaliera -
