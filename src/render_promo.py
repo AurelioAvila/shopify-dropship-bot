@@ -24,7 +24,7 @@ if not hasattr(PIL.Image, "ANTIALIAS"):
 import subprocess
 
 import requests
-from PIL import ImageFilter
+from PIL import ImageEnhance, ImageFilter
 from moviepy.editor import (
     AudioFileClip,
     ColorClip,
@@ -149,6 +149,19 @@ def _make_blurred_background(image_path: str, tmp_dir: str) -> str:
     left, top = (new_w - TARGET_W) // 2, (new_h - TARGET_H) // 2
     img = img.crop((left, top, left + TARGET_W, top + TARGET_H))
     img = img.filter(ImageFilter.GaussianBlur(radius=40))
+
+    # Corretto 2026-08-01 (segnalazione utente: "sbiadito" su Magdock, non
+    # sulla concorrenza es. CertSprint). Causa reale, verificata visivamente
+    # frame per frame: una sfocatura pesante su una foto con piu' colori
+    # (es. una tabella campioni colore) media tutto verso un grigio
+    # uniforme - il vecchio oscuramento lineare (moltiplicare ogni canale
+    # per 0.55) accentuava ulteriormente quell'effetto "grigiore", mentre
+    # CertSprint usa filmati stock gia' saturi e non ha questo problema.
+    # Fix: ripristinare la saturazione DOPO la sfocatura (che la sfocatura
+    # stessa attenua) prima di scurire, cosi' lo sfondo resta scuro ma
+    # colorato invece che grigio spento.
+    img = ImageEnhance.Color(img).enhance(1.6)
+    img = ImageEnhance.Contrast(img).enhance(1.1)
     img = PIL.Image.eval(img, lambda p: int(p * 0.55))  # darken so white captions stay readable
 
     out_path = os.path.join(tmp_dir, f"bg_{os.path.basename(image_path)}")
