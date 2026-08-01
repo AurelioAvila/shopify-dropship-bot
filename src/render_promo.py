@@ -21,11 +21,14 @@ import PIL.Image
 if not hasattr(PIL.Image, "ANTIALIAS"):
     PIL.Image.ANTIALIAS = PIL.Image.LANCZOS
 
+import subprocess
+
 import requests
 from PIL import ImageFilter
 from moviepy.editor import (
     AudioFileClip,
     ColorClip,
+    CompositeAudioClip,
     CompositeVideoClip,
     ImageClip,
     TextClip,
@@ -33,6 +36,30 @@ from moviepy.editor import (
 )
 
 from src.tts import generate_audio_with_timing
+
+
+def _generate_bg_music(path: str, duration: float) -> None:
+    """Sottofondo strumentale sintetizzato (accordo soffuso, nessun sample
+    esterno - stesso approccio gia' usato per CertSprint, evita ogni rischio
+    di copyright). Volume molto basso sotto la voce, con un lento crescendo.
+    Prima non c'era nessuna musica su questi video, solo voce - la aggiungiamo
+    per dare piu' produzione senza mai coprire il parlato."""
+    fade_in = min(duration * 0.4, 6.0)
+    fade_out = min(duration * 0.15, 2.0)
+    fade_out_start = max(duration - fade_out, 0.0)
+    notes = [130.81, 164.81, 196.00]  # accordo di Do maggiore (C-E-G), soffuso
+    cmd = ["ffmpeg", "-y"]
+    for freq in notes:
+        cmd += ["-f", "lavfi", "-i", f"sine=frequency={freq}:duration={duration}"]
+    cmd += [
+        "-filter_complex",
+        f"amix=inputs={len(notes)}:duration=longest,"
+        f"volume=0.05,"
+        f"afade=t=in:st=0:d={fade_in:.3f},"
+        f"afade=t=out:st={fade_out_start:.3f}:d={fade_out:.3f}",
+        str(path),
+    ]
+    subprocess.run(cmd, check=True, capture_output=True)
 
 TARGET_W, TARGET_H = 1080, 1920
 CAPTION_CHUNK_SIZE = 2
@@ -252,7 +279,13 @@ def build_promo_video(script_text: str, image_urls: list[str], output_path: str,
         .set_position(("center", CAPTION_BAND_Y))
     )
     captions = _caption_clips_timed(word_timings)
-    final = CompositeVideoClip([background, band, *captions], size=(TARGET_W, TARGET_H)).set_audio(audio)
+
+    bg_music_path = output_path.replace(".mp4", "_bgmusic.mp3")
+    _generate_bg_music(bg_music_path, duration)
+    bg_music = AudioFileClip(bg_music_path)
+    full_audio = CompositeAudioClip([bg_music, audio])
+
+    final = CompositeVideoClip([background, band, *captions], size=(TARGET_W, TARGET_H)).set_audio(full_audio)
     # bitrate esplicito e alto: senza, moviepy/ffmpeg usa un default basso che
     # comprime pesantemente i bordi netti del testo (causa reale dello sfocato).
     final.write_videofile(

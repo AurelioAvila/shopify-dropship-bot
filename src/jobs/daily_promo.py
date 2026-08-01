@@ -26,7 +26,7 @@ from src.clients.shopify_client import ShopifyClient
 from src.promo_scripts import build_caption_for_product, build_script_for_product
 from src.render_promo import LowResolutionError, build_promo_video
 from src.social.instagram_upload import upload_reel
-from src.social.tiktok_upload import upload_video
+from src.social.tiktok_upload import upload_video_to_inbox
 from src.social.youtube_upload import upload_video as upload_youtube_video
 from src.store import get_conn
 
@@ -105,9 +105,16 @@ def run(count: int = 2, skip_tiktok: bool = True, skip_instagram: bool = False, 
 
         if not skip_tiktok:
             try:
-                # SELF_ONLY finche' l'app non supera l'audit "Direct Post" di TikTok
-                upload_video(brand, output_path, caption, privacy_level="SELF_ONLY")
-                entry["tiktok"] = "ok"
+                # In attesa dell'audit "Direct Post" mandiamo il video nelle
+                # bozze ("Upload to TikTok") invece di pubblicarlo
+                # direttamente - funziona gia' oggi senza restrizione
+                # SELF_ONLY. La caption va incollata a mano (l'endpoint
+                # bozze non la accetta via API), la salviamo accanto al video.
+                upload_video_to_inbox(brand, output_path)
+                caption_path = output_path.replace(".mp4", "_tiktok_caption.txt")
+                with open(caption_path, "w", encoding="utf-8") as f:
+                    f.write(caption)
+                entry["tiktok"] = "ok (bozza)"
             except Exception as exc:
                 print(f"  ! TikTok fallito per {video_id}: {exc}")
                 entry["tiktok"] = f"error: {exc}"
@@ -122,14 +129,32 @@ def run(count: int = 2, skip_tiktok: bool = True, skip_instagram: bool = False, 
                 entry["instagram_error"] = str(exc)
 
         if not skip_youtube:
-            try:
-                yt_title = f"{caption.split('—')[0].strip()} #shorts"
-                description = f"{script}\n\n{caption}"
-                youtube_id = upload_youtube_video(brand, output_path, yt_title, description)
+            yt_title = f"{caption.split('—')[0].strip()} #shorts"
+            description = f"{script}\n\n{caption}"
+            # "exceeded number of videos" e' spesso un rate-limit a burst
+            # (visto risolversi da solo pochi minuti dopo nello stesso run),
+            # non un tetto giornaliero fisso - un retry con pausa recupera
+            # la maggior parte dei casi invece di segnarli come falliti.
+            last_exc = None
+            youtube_id = None
+            for attempt in range(3):
+                try:
+                    youtube_id = upload_youtube_video(brand, output_path, yt_title, description)
+                    break
+                except Exception as exc:
+                    last_exc = exc
+                    if attempt < 2:
+                        print(f"  ! YouTube fallito per {video_id} (tentativo {attempt + 1}/3), riprovo tra 90s: {exc}")
+                        time.sleep(90)
+            if youtube_id:
                 entry["youtube_id"] = youtube_id
-            except Exception as exc:
-                print(f"  ! YouTube fallito per {video_id}: {exc}")
-                entry["youtube_error"] = str(exc)
+            else:
+                print(f"  ! YouTube fallito definitivamente per {video_id}: {last_exc}")
+                entry["youtube_error"] = str(last_exc)
+
+        # pausa tra un prodotto e l'altro per non fare burst di upload
+        # ravvicinati su YouTube (causa probabile del rate-limit visto)
+        time.sleep(20)
 
         _append_log(entry)
         published += 1
