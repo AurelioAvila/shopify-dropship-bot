@@ -20,7 +20,7 @@ import random
 import subprocess
 
 from src.clients.cj_client import CJClient
-from src.render_promo import build_promo_video
+from src.render_promo import LowResolutionError, build_promo_video
 from src.social.youtube_upload import upload_video
 from src.store import get_conn
 
@@ -40,13 +40,16 @@ _ORDINALS = ["First", "Second", "Third", "Fourth", "Fifth", "Sixth", "Seventh", 
 
 
 def _niche_products(cj: CJClient, conn, brand: str, n: int) -> list:
+    # Sovra-pesca candidati (n*3): alcuni verranno scartati in generate()
+    # per bassa risoluzione immagine, serve un margine per arrivare comunque
+    # a n segmenti buoni senza far fallire l'intero video.
     keywords = NICHE_KEYWORDS[brand]
     pids = [r[0] for r in conn.execute("SELECT DISTINCT cj_pid FROM product_map").fetchall()]
     random.shuffle(pids)
 
     picked = []
     for pid in pids:
-        if len(picked) >= n:
+        if len(picked) >= n * 3:
             break
         detail = cj.get_product_detail(pid)
         title = detail.get("productNameEn") or ""
@@ -73,20 +76,37 @@ def generate(brand: str, n: int = 6) -> str:
     cj = CJClient()
     conn = get_conn()
 
-    products = _niche_products(cj, conn, brand, n)
+    candidates = _niche_products(cj, conn, brand, n)
     conn.close()
-    if len(products) < 3:
-        print(f"  ! solo {len(products)} prodotti trovati per {brand}, servono almeno 3 - salto")
+    if len(candidates) < 3:
+        print(f"  ! solo {len(candidates)} prodotti trovati per {brand}, servono almeno 3 - salto")
         return None
 
+    # Un prodotto con immagini a bassa risoluzione non deve far fallire
+    # l'intero video (bug reale visto il 2026-08-01: LowResolutionError non
+    # catturato mandava in crash l'intera generazione, perdendo anche i
+    # segmenti gia' renderizzati) - si salta e si passa al candidato dopo.
+    used_products = []
     clip_paths = []
-    for i, p in enumerate(products, start=1):
-        print(f"[{brand}] Genero segmento {i}/{len(products)}: {p['title'][:50]}...")
-        script = _segment_script(i, len(products), p["title"])
+    for p in candidates:
+        if len(used_products) >= n:
+            break
+        i = len(used_products) + 1
+        print(f"[{brand}] Genero segmento {i}/{n}: {p['title'][:50]}...")
+        script = _segment_script(i, n, p["title"])
         clip_path = os.path.join(OUTPUT_DIR, f"_segment_{brand}_{i}.mp4")
         tmp_dir = os.path.join(OUTPUT_DIR, f"_tmp_{brand}_{i}")
-        build_promo_video(script, p["images"], clip_path, tmp_dir)
+        try:
+            build_promo_video(script, p["images"], clip_path, tmp_dir)
+        except LowResolutionError as exc:
+            print(f"  ! {p['title'][:50]}: risoluzione troppo bassa, salto ({exc})")
+            continue
         clip_paths.append(clip_path)
+        used_products.append(p)
+
+    if len(clip_paths) < 3:
+        print(f"  ! solo {len(clip_paths)} segmenti validi per {brand} (troppi scarti per bassa risoluzione), servono almeno 3 - salto")
+        return None
 
     concat_list_path = os.path.join(OUTPUT_DIR, f"_concat_{brand}.txt")
     with open(concat_list_path, "w", encoding="utf-8") as f:
@@ -99,7 +119,7 @@ def generate(brand: str, n: int = 6) -> str:
         ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", concat_list_path, "-c", "copy", output_path],
         check=True,
     )
-    return output_path
+    return output_path, len(clip_paths)
 
 
 def publish(brand: str, video_path: str, n_products: int) -> str:
@@ -118,7 +138,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     brand_upper = args.brand.upper()
-    path = generate(brand_upper, args.n)
-    if path:
-        video_id = publish(brand_upper, path, args.n)
+    result = generate(brand_upper, args.n)
+    if result:
+        path, actual_n = result
+        video_id = publish(brand_upper, path, actual_n)
         print(f"[OK] Buying guide pubblicata: video id={video_id}")
