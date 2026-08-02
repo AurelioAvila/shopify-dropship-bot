@@ -23,7 +23,7 @@ import time
 
 from src.clients.cj_client import CJClient
 from src.clients.shopify_client import ShopifyClient
-from src.promo_scripts import build_caption_for_product, build_script_for_product
+from src.promo_scripts import build_caption_for_product, build_script_for_product, build_youtube_title
 from src.render_promo import LowResolutionError, build_promo_video
 from src.social.instagram_upload import upload_reel
 from src.social.tiktok_upload import upload_video_to_inbox
@@ -57,7 +57,8 @@ def _all_fresh_pids() -> list:
     return [pid for pid in all_pids if pid not in done_pids]
 
 
-def run(count: int = 2, skip_tiktok: bool = True, skip_instagram: bool = False, skip_youtube: bool = False) -> None:
+def run(count: int = 2, skip_tiktok: bool = False, skip_instagram: bool = False, skip_youtube: bool = False,
+        youtube_limit: int = 3) -> None:
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     cj = CJClient()
     shopify = ShopifyClient()
@@ -69,6 +70,7 @@ def run(count: int = 2, skip_tiktok: bool = True, skip_instagram: bool = False, 
         return
 
     published = 0
+    youtube_uploaded = 0
     for pid in candidates:
         if published >= count:
             break
@@ -81,7 +83,7 @@ def run(count: int = 2, skip_tiktok: bool = True, skip_instagram: bool = False, 
             _append_log({"cj_pid": pid, "title": title, "skipped": "no_images"})
             continue
 
-        script, niche = build_script_for_product(title)
+        script, niche, hook = build_script_for_product(title)
         brand = "GROOMLYCO" if niche == "PET" else "MAGDOCK"
         video_id = f"auto-{int(time.time())}-{pid[-6:]}"
         output_path = os.path.join(OUTPUT_DIR, f"{video_id}.mp4")
@@ -89,7 +91,7 @@ def run(count: int = 2, skip_tiktok: bool = True, skip_instagram: bool = False, 
 
         print(f"[{brand}] Genero video per '{title}' ({pid})...")
         try:
-            build_promo_video(script, images[:8], output_path, tmp_dir, niche=niche)
+            build_promo_video(script, images[:8], output_path, tmp_dir, niche=niche, hook=hook)
         except LowResolutionError as exc:
             # Standing quality bar (2026-08-01): mai pubblicare un Reel
             # visibilmente sfocato solo per rispettare la quota giornaliera -
@@ -100,7 +102,7 @@ def run(count: int = 2, skip_tiktok: bool = True, skip_instagram: bool = False, 
             _append_log({"cj_pid": pid, "title": title, "skipped": "low_resolution"})
             continue
 
-        caption = build_caption_for_product(title, niche)
+        caption = build_caption_for_product(title, niche, hook)
         entry = {"cj_pid": pid, "title": title, "brand": brand, "video_id": video_id, "script": script}
 
         if not skip_tiktok:
@@ -129,13 +131,23 @@ def run(count: int = 2, skip_tiktok: bool = True, skip_instagram: bool = False, 
                 print(f"  ! Instagram fallito per {video_id}: {exc}")
                 entry["instagram_error"] = str(exc)
 
-        if not skip_youtube:
-            yt_title = f"{caption.split('—')[0].strip()} #shorts"
+        if not skip_youtube and youtube_uploaded < youtube_limit:
+            # Costruito dall'HOOK e con "#shorts" garantito entro i 100
+            # caratteri: prima partiva dalla caption intera (CTA + hashtag
+            # Instagram inclusi), arrivava a 130-187 caratteri, YouTube
+            # troncava a 100 e "#shorts" spariva - verificato sul video
+            # pubblicato _JQ5J6ktUDs. Vedi build_youtube_title.
+            yt_title = build_youtube_title(hook)
             description = f"{script}\n\n{caption}"
-            # "exceeded number of videos" e' spesso un rate-limit a burst
-            # (visto risolversi da solo pochi minuti dopo nello stesso run),
-            # non un tetto giornaliero fisso - un retry con pausa recupera
-            # la maggior parte dei casi invece di segnarli come falliti.
+            # I progetti OAuth non ancora verificati da Google hanno una quota
+            # giornaliera di upload video molto bassa (uploadLimitExceeded) -
+            # confermato live 2026-08-01: 3 tentativi con pausa di 90s NON la
+            # aggirano quando la quota e' davvero esaurita (a differenza di un
+            # rate-limit a burst). Per questo motivo limitiamo gli upload
+            # YouTube per run (youtube_limit) invece di ritentare all'infinito
+            # su ogni prodotto - IG e TikTok non hanno questa restrizione e
+            # restano quindi il canale principale finche' l'app non viene
+            # verificata da Google.
             last_exc = None
             youtube_id = None
             for attempt in range(3):
@@ -149,9 +161,12 @@ def run(count: int = 2, skip_tiktok: bool = True, skip_instagram: bool = False, 
                         time.sleep(90)
             if youtube_id:
                 entry["youtube_id"] = youtube_id
+                youtube_uploaded += 1
             else:
                 print(f"  ! YouTube fallito definitivamente per {video_id}: {last_exc}")
                 entry["youtube_error"] = str(last_exc)
+        elif not skip_youtube:
+            print(f"  - YouTube: limite di {youtube_limit}/run gia' raggiunto, salto per {video_id} (resta su IG/TikTok)")
 
         # pausa tra un prodotto e l'altro per non fare burst di upload
         # ravvicinati su YouTube (causa probabile del rate-limit visto)
@@ -169,12 +184,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--count", type=int, default=2, help="Quanti prodotti nuovi promuovere oggi")
     parser.add_argument("--only-tiktok", action="store_true")
-    parser.add_argument("--with-tiktok", action="store_true", help="Prova anche TikTok (richiede token gia' generati per il brand)")
+    parser.add_argument("--skip-tiktok", action="store_true", help="Salta TikTok (es. se i token per il brand non sono pronti)")
     parser.add_argument("--skip-youtube", action="store_true", help="Salta la pubblicazione YouTube (es. se i token per i brand non sono ancora pronti)")
     args = parser.parse_args()
     run(
         count=args.count,
-        skip_tiktok=not (args.with_tiktok or args.only_tiktok),
+        skip_tiktok=args.skip_tiktok,
         skip_instagram=args.only_tiktok,
         skip_youtube=args.only_tiktok or args.skip_youtube,
     )

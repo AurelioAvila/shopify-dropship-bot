@@ -15,6 +15,7 @@ from src.social.instagram_upload import upload_reel
 from src.social.tiktok_upload import upload_video_to_inbox
 from src.social.youtube_upload import upload_video as upload_youtube_video
 from src.social.x_upload import post_tweet
+from src.promo_scripts import build_youtube_title
 
 OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data", "promo_videos")
 
@@ -111,7 +112,11 @@ def publish_all(only: str | None = None, skip_tiktok: bool = False, skip_instagr
 
         if not skip_youtube:
             try:
-                yt_title = f"{caption.split('—')[0].strip()} #shorts"
+                # "#shorts" garantito entro i 100 caratteri del titolo -
+                # vedi build_youtube_title. Qui l'hook non e' disponibile
+                # separatamente, quindi si usa la prima frase della caption
+                # (che e' l'hook, dal fix caption/hook del 2026-08-02).
+                yt_title = build_youtube_title(caption.split("\n")[0].split(". ")[0])
                 upload_youtube_video(brand, video_path, yt_title, caption)
             except Exception as exc:
                 print(f"  ! {video_id}: errore pubblicazione YouTube: {exc}")

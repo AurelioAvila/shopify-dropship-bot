@@ -223,3 +223,34 @@ def build_caption_for_product(title: str, niche: str, hook: str) -> str:
     # senza perdere del tutto la spinta diretta al negozio.
     cta = random.choice(_SHARE_CTAS) if random.random() < 0.5 else _CTA
     return f"{hook} {cta} {tags}"
+
+
+# Limite reale dei titoli YouTube. Superarlo NON fa fallire l'upload: YouTube
+# tronca silenziosamente a 100 caratteri, e siccome "#shorts" stava in coda
+# era proprio lui a sparire.
+YOUTUBE_TITLE_MAX = 100
+_SHORTS_SUFFIX = " #shorts"
+
+
+def build_youtube_title(hook: str) -> str:
+    """Titolo YouTube a partire dall'hook, con "#shorts" SEMPRE presente.
+
+    Bug reale (2026-08-02, video _JQ5J6ktUDs): il titolo era costruito dalla
+    caption intera, che include CTA e hashtag di Instagram, arrivando a
+    130-187 caratteri. YouTube troncava a 100 e "#shorts", essendo in fondo,
+    veniva mangiato - il video perdeva la classificazione come Short.
+    Verificato sul video pubblicato: titolo di esattamente 100 caratteri,
+    nessun "#shorts".
+
+    Due correzioni insieme:
+      - si parte dall'HOOK, non dalla caption: "Shop the link in our bio" e
+        gli hashtag sono testo da Instagram, in un titolo YouTube non ci
+        vanno;
+      - il troncamento avviene su confine di parola e riserva lo spazio per
+        il suffisso, che quindi non puo' piu' essere tagliato.
+    """
+    hook = (hook or "").strip()
+    budget = YOUTUBE_TITLE_MAX - len(_SHORTS_SUFFIX)
+    if len(hook) > budget:
+        hook = hook[:budget].rsplit(" ", 1)[0].rstrip(" ,.;:-")
+    return f"{hook}{_SHORTS_SUFFIX}"
