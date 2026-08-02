@@ -166,12 +166,68 @@ def _generate_whoosh(path: str, duration: float = 0.3) -> None:
 
 
 TARGET_W, TARGET_H = 1080, 1920
+
+# Normalizzazione loudness a -14 LUFS, lo standard di fatto per streaming e
+# social (2026-08-02). Il bitrate qui era gia' esplicito (fix anti-sfocato),
+# ma l'audio no: misurato -23.9 dB medi su un promo reale, quasi 10 dB sotto
+# lo standard. Nel feed un video piu' basso degli altri suona "debole" e
+# invita allo scroll - nessuno alza il volume, si passa al video dopo.
+LOUDNORM_FILTER = "loudnorm=I=-14:TP=-1.5:LRA=11"
+
+
+def _normalize_loudness(path: str) -> None:
+    """Porta l'audio del video gia' renderizzato a -14 LUFS.
+
+    NON si puo' fare con ffmpeg_params=["-af", ...] in write_videofile:
+    moviepy muxa l'audio in "codec copy" e ffmpeg rifiuta filtro + streamcopy
+    insieme ("Filtering and streamcopy cannot be used together") - verificato
+    con smoke test, il render fallisce del tutto.
+
+    Il video e' copiato bit-per-bit (-c:v copy): nessuna ricompressione
+    video. Se ffmpeg fallisce il file originale resta intatto - un audio non
+    normalizzato e' molto meglio di nessun video.
+    """
+    import shutil
+
+    tmp_path = path + ".norm.mp4"
+    cmd = [
+        "ffmpeg", "-y", "-i", path,
+        "-c:v", "copy",
+        "-af", LOUDNORM_FILTER,
+        "-c:a", "aac", "-b:a", "192k",
+        # Questa passata rimuxa: senza ri-specificare +faststart il moov atom
+        # tornerebbe in fondo, riportando il bug del "primo tap non parte".
+        "-movflags", "+faststart",
+        tmp_path,
+    ]
+    try:
+        subprocess.run(cmd, check=True, capture_output=True)
+        shutil.move(tmp_path, path)
+        print(f"  [render] audio normalizzato a -14 LUFS: {os.path.basename(path)}")
+    except Exception as exc:
+        print(f"  [render] normalizzazione audio saltata ({exc}) - video invariato")
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+
+
 CAPTION_CHUNK_SIZE = 2
 CAPTION_FONTSIZE = 80
 CAPTION_Y = int(TARGET_H * 0.62)
 CAPTION_BAND_Y = int(TARGET_H * 0.56)
 CAPTION_BAND_HEIGHT = int(TARGET_H * 0.22)
 CAPTION_POP_SECONDS = 0.12
+
+# HOOK CARD (aggiunto 2026-08-02) - la singola leva piu' importante trovata
+# nell'audit sulle view basse. Le didascalie sono sincronizzate a 2 parole
+# per volta, quindi al fotogramma 0 lo spettatore leggeva solo un frammento
+# senza senso ("If your", "This is") proprio nei 3 secondi in cui decide se
+# restare o scrollare. La ricerca 2026 (Hansen Insights, Aibrify, HypeNest)
+# e' netta: sotto l'80% di retention nei primi 3 secondi il video muore nel
+# cold start senza mai essere distribuito. Ora la promessa COMPLETA e'
+# leggibile istantaneamente dal primo fotogramma, sopra le didascalie.
+HOOK_CARD_SECONDS = 2.8
+HOOK_CARD_FONTSIZE = 66
+HOOK_CARD_Y = int(TARGET_H * 0.20)
 
 # Same bundled font as the other video pipelines (PC Tweaker, Shorts bot) -
 # ImageMagick's Windows build silently falls back to a thin default font
@@ -380,7 +436,54 @@ def _make_caption_clip(text: str, start: float, duration: float):
     return clip
 
 
-def _caption_clips_timed(word_timings: list):
+def _make_hook_card(hook_text: str, duration: float):
+    """Full hook sentence, readable at frame 0, over its own dark backdrop.
+
+    Deliberately NO pop/scale animation and no fade-in: the whole point is
+    that it's already fully legible in the very first frame, before the
+    viewer's thumb decides. Any entrance animation costs exactly the
+    milliseconds that matter most."""
+    text = hook_text.strip()
+    if not text:
+        return []
+
+    common = dict(
+        fontsize=HOOK_CARD_FONTSIZE, method="caption",
+        size=(TARGET_W - 140, None), font=FONT_PATH, align="center",
+    )
+    # Stessa tecnica a due livelli delle didascalie: la combinazione
+    # fill+stroke in un unico passaggio ImageMagick e' inaffidabile su questa
+    # macchina (vedi il commento in _make_caption_clip).
+    stroke_layer = TextClip(text, color="black", stroke_color="black", stroke_width=7, **common)
+    fill_layer = TextClip(text, color="white", **common)
+
+    card_w, card_h = stroke_layer.size
+    # 0.78 e non ~0.6: su sfondi chiari un nero al 60% legge come un riquadro
+    # grigio slavato (verificato sul primo render di prova), che fa sembrare
+    # il video amatoriale invece di un elemento grafico voluto.
+    backdrop = (
+        ColorClip(size=(card_w + 60, card_h + 50), color=(0, 0, 0))
+        .set_opacity(0.78)
+        .set_duration(duration)
+    )
+    text_group = CompositeVideoClip(
+        [stroke_layer, fill_layer.set_position(("center", "center"))],
+        size=(card_w, card_h),
+    ).set_duration(duration)
+
+    card = CompositeVideoClip(
+        [backdrop, text_group.set_position(("center", "center"))],
+        size=(card_w + 60, card_h + 50),
+    ).set_duration(duration).set_start(0).set_position(("center", HOOK_CARD_Y))
+    return [card]
+
+
+def _caption_clips_timed(word_timings: list, skip_before: float = 0.0):
+    """skip_before: quando c'e' l'hook card, le didascalie parola-per-parola
+    dei primi secondi ripetono esattamente il testo gia' mostrato per intero
+    dalla card - due riquadri sovrapposti che dicono la stessa cosa. Si
+    saltano, cosi' l'apertura resta pulita e la card e' l'unico elemento
+    che l'occhio deve leggere."""
     if not word_timings:
         return []
     chunks, current = [], []
@@ -398,6 +501,8 @@ def _caption_clips_timed(word_timings: list):
         text = " ".join(w["text"] for w in chunk)
         start = chunk[0]["offset"]
         end = chunk[-1]["offset"] + chunk[-1]["duration"]
+        if start < skip_before:
+            continue
         clips.append(_make_caption_clip(text, start, end - start))
     return clips
 
@@ -407,7 +512,7 @@ def _caption_clips_timed(word_timings: list):
 MAX_SEGMENT_SECONDS = 2.5
 
 
-def build_promo_video(script_text: str, image_urls: list[str], output_path: str, tmp_dir: str, niche: str = None) -> str:
+def build_promo_video(script_text: str, image_urls: list[str], output_path: str, tmp_dir: str, niche: str = None, hook: str = None) -> str:
     audio_path = output_path.replace(".mp4", ".mp3")
     word_timings = generate_audio_with_timing(script_text, audio_path)
     audio = AudioFileClip(audio_path)
@@ -447,13 +552,22 @@ def build_promo_video(script_text: str, image_urls: list[str], output_path: str,
     # semi-transparent dark band behind the captions guarantees contrast
     # regardless of what's behind them, same fix already used in the
     # sibling video pipelines (PC Tweaker, Shorts bot).
+    # L'hook card non deve mai superare la durata del video (video molto
+    # corti) ne' restare in scena dopo che la voce ha gia' superato l'hook.
+    hook_seconds = min(HOOK_CARD_SECONDS, duration) if hook else 0.0
+    hook_clips = _make_hook_card(hook, hook_seconds) if hook else []
+
+    # La banda parte solo quando finisce l'hook card: durante l'apertura
+    # l'unico elemento grafico deve essere la card, altrimenti si vedono due
+    # riquadri scuri sovrapposti (verificato sul primo render di prova).
     band = (
         ColorClip(size=(TARGET_W, CAPTION_BAND_HEIGHT), color=(0, 0, 0))
         .set_opacity(0.45)
-        .set_duration(duration)
+        .set_start(hook_seconds)
+        .set_duration(max(duration - hook_seconds, 0.1))
         .set_position(("center", CAPTION_BAND_Y))
     )
-    captions = _caption_clips_timed(word_timings)
+    captions = _caption_clips_timed(word_timings, skip_before=hook_seconds)
 
     bg_music_path = output_path.replace(".mp4", "_bgmusic.mp3")
     _make_bg_music(bg_music_path, duration, niche=niche)
@@ -471,7 +585,7 @@ def build_promo_video(script_text: str, image_urls: list[str], output_path: str,
 
     full_audio = CompositeAudioClip([bg_music, audio, *whoosh_layers])
 
-    final = CompositeVideoClip([background, band, *captions], size=(TARGET_W, TARGET_H)).set_audio(full_audio)
+    final = CompositeVideoClip([background, band, *captions, *hook_clips], size=(TARGET_W, TARGET_H)).set_audio(full_audio)
     # bitrate esplicito e alto: senza, moviepy/ffmpeg usa un default basso che
     # comprime pesantemente i bordi netti del testo (causa reale dello sfocato).
     final.write_videofile(
@@ -483,4 +597,5 @@ def build_promo_video(script_text: str, image_urls: list[str], output_path: str,
         # (segnalato dall'utente 2026-08-02, moviepy non lo aggiunge di default).
         ffmpeg_params=["-movflags", "+faststart"],
     )
+    _normalize_loudness(output_path)
     return output_path
