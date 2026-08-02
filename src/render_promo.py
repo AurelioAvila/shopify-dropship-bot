@@ -143,20 +143,23 @@ def _make_bg_music(path: str, duration: float, niche: str = None) -> None:
         _generate_bg_music(path, duration)
 
 
-def _generate_whoosh(path: str, duration: float = 0.35) -> None:
+def _generate_whoosh(path: str, duration: float = 0.3) -> None:
     """Whoosh sintetizzato (rumore filtrato con fade) per marcare i tagli tra
-    un'immagine e l'altra - stesso pattern gia' usato per CertSprint. Prima
-    questi video non avevano nessun suono di transizione, solo un taglio
-    secco; un whoosh discreto sui cambi scena e' lo standard di sound design
-    2026 per i tagli in questo tipo di contenuto (ricerca 2026-08-01)."""
+    un'immagine e l'altra. La banda larga precedente (800-6000Hz) a volume
+    0.35 lasciava passare sia il "ronzio" grave che il sibilo acuto del
+    rumore rosa grezzo, che senza uno sweep di frequenza (i whoosh veri usano
+    un filtro che si sposta nel tempo, non una banda fissa) si sentiva come
+    un fruscio/graffio violento invece che un passaggio morbido - segnalato
+    dall'utente 2026-08-02 su Groomlyco. Banda piu' stretta e centrale,
+    volume molto piu' basso, fade piu' lunghi e morbidi."""
     subprocess.run([
         "ffmpeg", "-y", "-f", "lavfi",
         "-i", f"anoisesrc=color=pink:duration={duration}:sample_rate=44100",
         "-af", (
-            "highpass=f=800,lowpass=f=6000,"
-            "afade=t=in:st=0:d=0.04,"
+            "highpass=f=2500,lowpass=f=4500,"
+            "afade=t=in:st=0:d=0.1,"
             f"afade=t=out:st={duration - 0.12:.3f}:d=0.12,"
-            "volume=0.35"
+            "volume=0.12"
         ),
         str(path),
     ], check=True, capture_output=True)
