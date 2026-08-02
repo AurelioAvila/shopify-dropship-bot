@@ -23,12 +23,33 @@ from src.clients.cj_client import CJClient
 from src.render_promo import LowResolutionError, build_promo_video
 from src.social.youtube_upload import upload_video
 from src.store import get_conn
+from src.thumbnail import build_thumbnail
 
 OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data", "buying_guides")
 
+# Pool di titoli invece di un template unico (fix 2026-08-02): prima era una
+# sola stringa per brand e `-n` ha default 6, quindi OGNI buying guide usciva
+# col titolo IDENTICO ("Top 6 Pet Grooming Must-Haves in 2026"). Su un canale
+# YouTube titoli duplicati si cannibalizzano nella ricerca e non danno a chi
+# scorre nessun motivo per cliccare il nuovo invece del vecchio. Le varianti
+# puntano su curiosita'/beneficio ("che ho ricomprato", "che valgono davvero")
+# invece del semplice elenco, coerente col dato che gli hook con conseguenza
+# battono quelli generici (vedi feedback_reinforce_winning_hooks).
 NICHE_TITLES = {
-    "GROOMLYCO": "Top {n} Pet Grooming Must-Haves in 2026",
-    "MAGDOCK": "Top {n} Phone & Car Accessories Worth Buying in 2026",
+    "GROOMLYCO": [
+        "Top {n} Pet Grooming Must-Haves in 2026",
+        "{n} Dog Grooming Tools That Actually Last (2026)",
+        "The {n} Pet Products I'd Buy Again in 2026",
+        "{n} Things Every Dog Owner Should Own (2026)",
+        "{n} Pet Grooming Upgrades Worth The Money in 2026",
+    ],
+    "MAGDOCK": [
+        "Top {n} Phone & Car Accessories Worth Buying in 2026",
+        "{n} Phone Accessories That Are Actually Worth It (2026)",
+        "The {n} Tech Buys I Use Every Single Day (2026)",
+        "{n} Car & Phone Upgrades That Fixed Daily Annoyances (2026)",
+        "{n} Phone Accessories You'll Wish You Bought Sooner (2026)",
+    ],
 }
 
 NICHE_KEYWORDS = {
@@ -122,13 +143,44 @@ def generate(brand: str, n: int = 6) -> str:
     return output_path, len(clip_paths)
 
 
+TAG_POOLS = {
+    "GROOMLYCO": ["#petcare", "#doggrooming", "#petproducts", "#dogsoftiktok",
+                  "#puppylove", "#petmusthaves", "#dogmom", "#petaccessories"],
+    "MAGDOCK": ["#techaccessories", "#phoneaccessories", "#caraccessories",
+                "#techtok", "#lifehack", "#gadgets", "#magsafe", "#deskaesthetic"],
+}
+
+
 def publish(brand: str, video_path: str, n_products: int) -> str:
-    title = NICHE_TITLES[brand].format(n=n_products)
-    description = (
-        f"{title}\n\nShop the full collection - link in our bio.\n\n"
-        + ("#petcare #doggrooming #petproducts" if brand == "GROOMLYCO" else "#techaccessories #phoneaccessories #caraccessories")
-    )
-    return upload_video(brand, video_path, title, description, tags=["petcare"] if brand == "GROOMLYCO" else ["techaccessories"])
+    title = random.choice(NICHE_TITLES[brand]).format(n=n_products)
+    # Prima erano sempre gli stessi 3 hashtag identici su ogni video - stesso
+    # tag pool statico non rinnovato = look ripetitivo/spam agli occhi
+    # dell'algoritmo. Ora pesca un sottoinsieme casuale, stesso principio gia'
+    # in uso per gli Shorts giornalieri (src/promo_scripts.py).
+    tags = " ".join(random.sample(TAG_POOLS[brand], 4))
+    description = f"{title}\n\nShop the full collection - link in our bio.\n\n{tags}"
+
+    # Miniatura col titolo in grande: su un long-form e' LA leva del click,
+    # e senza YouTube ne sceglieva una da un fotogramma a caso (tipicamente
+    # meta' di una parola dei sottotitoli). Se la generazione fallisce si
+    # pubblica lo stesso con quella automatica.
+    thumbnail_path = None
+    try:
+        thumbnail_path = build_thumbnail(
+            title,
+            os.path.join(OUTPUT_DIR, f"thumb_{brand.lower()}.jpg"),
+            video_path=video_path,
+            brand=brand,
+        )
+    except Exception as exc:
+        print(f"  ! miniatura non generata ({exc}) - si prosegue senza")
+
+    # I tag dell'API sono un canale diverso dagli hashtag visibili: qui vanno
+    # senza '#' e conviene usarli tutti (il campo regge ~500 caratteri), non
+    # solo i primi due.
+    api_tags = [t.lstrip("#") for t in TAG_POOLS[brand]]
+    return upload_video(brand, video_path, title, description, tags=api_tags,
+                        thumbnail_path=thumbnail_path)
 
 
 if __name__ == "__main__":

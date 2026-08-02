@@ -31,7 +31,8 @@ def _get_authenticated_service(brand: str):
     return build("youtube", "v3", credentials=creds)
 
 
-def upload_video(brand: str, video_path: str, title: str, description: str, tags: list = None) -> str:
+def upload_video(brand: str, video_path: str, title: str, description: str, tags: list = None,
+                 thumbnail_path: str = None) -> str:
     youtube = _get_authenticated_service(brand)
 
     body = {
@@ -57,4 +58,14 @@ def upload_video(brand: str, video_path: str, title: str, description: str, tags
             print(f"  Upload in corso: {int(status.progress() * 100)}%")
 
     print(f"[OK] [{brand}] Pubblicato su YouTube: video id={response['id']}")
+
+    # Miniatura personalizzata (solo dove il chiamante la fornisce, in pratica
+    # i buying guide long-form: sugli Shorts il feed parte in autoplay e la
+    # miniatura conta pochissimo). upload_thumbnail non solleva mai, quindi un
+    # canale senza telefono verificato non fa fallire una pubblicazione gia'
+    # andata a buon fine.
+    if thumbnail_path:
+        from src.thumbnail import upload_thumbnail
+        upload_thumbnail(youtube, response["id"], thumbnail_path)
+
     return response["id"]
