@@ -474,5 +474,10 @@ def build_promo_video(script_text: str, image_urls: list[str], output_path: str,
     final.write_videofile(
         output_path, fps=30, codec="libx264", audio_codec="aac",
         bitrate="8000k", preset="medium", logger=None,
+        # moov atom in testa al file invece che in fondo - senza questo il
+        # player deve scaricare l'intero file prima di poter leggere i
+        # metadati, causando il classico "primo tap non parte, secondo si"
+        # (segnalato dall'utente 2026-08-02, moviepy non lo aggiunge di default).
+        ffmpeg_params=["-movflags", "+faststart"],
     )
     return output_path
