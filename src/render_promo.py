@@ -4,6 +4,7 @@ Monta un video promozionale verticale (1080x1920) a partire da:
 - un copione, letto con voce IA (edge-tts) e sottotitolato in automatico
 Stessa impostazione visiva (font, stroke, banda sottotitoli) del bot Shorts.
 """
+import json
 import os
 
 # Windows ha un convert.exe di sistema (System32) che non c'entra con
@@ -75,6 +76,71 @@ def _generate_bg_music(path: str, duration: float) -> None:
         str(path),
     ]
     subprocess.run(cmd, check=True, capture_output=True)
+
+
+# Test cross-promo (2026-08-02, richiesta utente): come gia' fatto per
+# CertSprint, prova una traccia strumentale reale dell'artista "Low Static"
+# (progetto musicale dello stesso utente, zero rischio di licenza) al posto
+# dell'accordo sintetizzato, per un numero limitato di generazioni per brand
+# prima di decidere se tenerla. Traccia diversa per brand cosi' il test copre
+# anche varieta' di genere, non solo "musica reale si/no":
+# - Groomlyco (pet, tono caldo/rassicurante) -> "Fading into the Static" (warm/analog)
+# - Magdock (tech, tono moderno) -> "Beneath the Static" (dark ambient)
+_MUSIC_DIR = os.path.join(os.path.dirname(__file__), "..", "assets", "music")
+LOW_STATIC_TEST_TRACKS = {
+    "PET": os.path.join(_MUSIC_DIR, "low_static_fading_into_the_static.mp3"),
+    "TECH": os.path.join(_MUSIC_DIR, "low_static_beneath_the_static.mp3"),
+}
+LOW_STATIC_TEST_STATE_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "low_static_test_state.json")
+LOW_STATIC_TEST_VIDEO_LIMIT_PER_NICHE = 6  # ~1 settimana di run prima di rivalutare con l'utente
+
+
+def _load_low_static_test_count(niche: str) -> int:
+    if not os.path.exists(LOW_STATIC_TEST_STATE_PATH):
+        return 0
+    with open(LOW_STATIC_TEST_STATE_PATH) as f:
+        return json.load(f).get(niche, 0)
+
+
+def _bump_low_static_test_count(niche: str) -> None:
+    os.makedirs(os.path.dirname(LOW_STATIC_TEST_STATE_PATH), exist_ok=True)
+    counts = {}
+    if os.path.exists(LOW_STATIC_TEST_STATE_PATH):
+        with open(LOW_STATIC_TEST_STATE_PATH) as f:
+            counts = json.load(f)
+    counts[niche] = counts.get(niche, 0) + 1
+    with open(LOW_STATIC_TEST_STATE_PATH, "w") as f:
+        json.dump(counts, f)
+
+
+def _generate_bg_music_from_track(path: str, duration: float, track_path: str) -> None:
+    """Stesso trattamento (volume basso, fade in/out) ma partendo da una
+    traccia reale invece dei toni sintetizzati - loopata e tagliata sulla
+    durata esatta del video."""
+    fade_in = min(duration * 0.4, 6.0)
+    fade_out = min(duration * 0.15, 2.0)
+    fade_out_start = max(duration - fade_out, 0.0)
+    subprocess.run([
+        "ffmpeg", "-y",
+        "-stream_loop", "-1", "-i", track_path,
+        "-t", f"{duration:.3f}",
+        "-af",
+        f"volume=0.12,"
+        f"afade=t=in:st=0:d={fade_in:.3f},"
+        f"afade=t=out:st={fade_out_start:.3f}:d={fade_out:.3f}",
+        str(path),
+    ], check=True, capture_output=True)
+
+
+def _make_bg_music(path: str, duration: float, niche: str = None) -> None:
+    """Sceglie tra la traccia di test Low Static (per nicchia) e il
+    sottofondo sintetizzato di default, fino a esaurimento del tetto di test."""
+    track_path = LOW_STATIC_TEST_TRACKS.get(niche) if niche else None
+    if track_path and os.path.exists(track_path) and _load_low_static_test_count(niche) < LOW_STATIC_TEST_VIDEO_LIMIT_PER_NICHE:
+        _generate_bg_music_from_track(path, duration, track_path)
+        _bump_low_static_test_count(niche)
+    else:
+        _generate_bg_music(path, duration)
 
 
 def _generate_whoosh(path: str, duration: float = 0.35) -> None:
@@ -387,7 +453,7 @@ def build_promo_video(script_text: str, image_urls: list[str], output_path: str,
     captions = _caption_clips_timed(word_timings)
 
     bg_music_path = output_path.replace(".mp4", "_bgmusic.mp3")
-    _generate_bg_music(bg_music_path, duration)
+    _make_bg_music(bg_music_path, duration, niche=niche)
     bg_music = AudioFileClip(bg_music_path)
 
     # Whoosh discreto a ogni cambio immagine (tranne il primo, l'apertura non
