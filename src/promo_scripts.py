@@ -31,10 +31,17 @@ _CTA = "Shop the link in our bio 🛒"
 # condividere, il che significa non attivare mai il segnale piu' forte che
 # l'algoritmo guarda. Queste si aggiungono in rotazione, mantenendo comunque
 # il link in bio.
+# Bug trovato con un audit su 400 generazioni (2026-08-02): concatenando
+# queste con _CTA il carrello finiva DUE volte nella stessa caption
+# ("...forget 🛒 Shop the link in our bio 🛒") sul 51% dei video. Era
+# visibile anche nel mio test a campione e mi era sfuggito - contare i
+# difetti su tutto il pool lo ha reso ovvio. Ora la parte "shop" e' senza
+# emoji e l'emoji compare una sola volta, in chiusura.
+_SHOP_TEXT = "Shop the link in our bio"
 _SHARE_CTAS = [
-    "Save this before you forget 🛒 " + _CTA,
-    "Tag someone who needs this 🛒 " + _CTA,
-    "Send this to a friend who'd actually use it 🛒 " + _CTA,
+    f"Save this before you forget. {_SHOP_TEXT} 🛒",
+    f"Tag someone who needs this. {_SHOP_TEXT} 🛒",
+    f"Send this to a friend who'd actually use it. {_SHOP_TEXT} 🛒",
 ]
 
 PET_HOOKS = [
@@ -88,50 +95,84 @@ SUBCATEGORY_KEYWORDS = {
 }
 
 SUBCATEGORY_HOOKS = {
+    # Pool ampliati da 3 a 6-7 hook ciascuno (2026-08-02): un audit su 400
+    # generazioni ha mostrato solo 29 hook/titoli distinti in totale, cioe'
+    # a 2-4 video al giorno ci si ripeteva ogni ~10 giorni. Gli archetipi
+    # sono volutamente diversi tra loro (prima persona / conseguenza / POV /
+    # momento specifico / mito da smontare) invece di variazioni della stessa
+    # formula, che sarebbero varieta' solo apparente.
     "PET_GROOMING": [
         "If your dog hates this every single time, you're probably doing it wrong.",
         "This is the mistake almost every dog owner makes while grooming.",
         "Grooming used to take two people and end in a wet bathroom floor.",
+        "My dog used to hide the second he heard the clippers come out.",
+        "Nobody tells you the groomer bill adds up to a holiday every year.",
+        "The trick isn't holding him still, it's what you do before that.",
+        "Ten minutes at home beats an hour of wrestling at the salon.",
     ],
     "PET_FEEDING": [
         "If your dog inhales dinner in nine seconds flat, that's a real problem.",
         "Nobody warns you that eating too fast is what makes dogs sick later.",
         "A bored dog and a full bowl is a worse combination than it sounds.",
+        "My vet asked one question about mealtimes and it explained everything.",
+        "Your dog isn't greedy, the bowl is just the wrong shape.",
+        "The bloating scare cost me a night at the emergency vet.",
     ],
     "PET_COMFORT": [
         "If your dog can't settle in summer, it's not restlessness, it's the heat.",
         "Most dog beds stop working exactly when your dog needs them most.",
         "There's a reason your dog abandons the bed and lies on the tiles.",
+        "I kept turning the AC up for a dog who just needed a cold surface.",
+        "Panting through the night isn't normal, it's a signal.",
+        "The floor is winning against a bed you paid good money for.",
     ],
     "PET_WALKING": [
         "If your dog pulls the whole walk, the leash is half the problem.",
         "The mistake almost everyone makes on walks shows up months later.",
         "One bad harness is how a normal walk turns into a fight.",
+        "My shoulder gave out before my dog's enthusiasm ever did.",
+        "Pulling isn't disobedience, it's leverage, and you're losing it.",
+        "The walk got easier the day I stopped blaming the dog.",
     ],
     "PET_TOYS": [
         "If your dog destroys everything when you leave, it's not bad behavior, it's boredom.",
         "Most dog toys are dead in a day, and that's the actual problem.",
         "A dog that never gets bored behaves completely differently.",
+        "I came home to a shredded sofa and finally understood the pattern.",
+        "The chewing stops when the brain has something else to do.",
+        "You're not buying a toy, you're buying twenty quiet minutes.",
     ],
     "TECH_CHARGING": [
         "One clean setup instead of a tangled mess of cables every night.",
         "Cheap chargers fail in the one moment you actually needed them.",
         "If your phone charges slower than it used to, it might not be the battery.",
+        "I found out mine was faulty at four percent in an airport.",
+        "Three cables on the nightstand and none of them the right one.",
+        "The cable isn't broken, it's just never been fast in the first place.",
     ],
     "TECH_CAR": [
         "Your phone keeps sliding every time you brake, and there's a reason for that.",
         "POV: your phone never falls off the dashboard again.",
         "The difference between a cheap mount and a good one shows up at the first pothole.",
+        "Mine let go on a roundabout and I fished it out of the footwell.",
+        "Looking down for two seconds is the whole reason this exists.",
+        "Every cheap mount holds fine until the road stops being smooth.",
     ],
     "TECH_CASE": [
         "I stress-tested this case so you don't have to.",
         "Most people find out their case is useless the hard way.",
         "The drop that kills your phone is never the one you expect.",
+        "Waist height onto tile is what actually breaks screens, not big falls.",
+        "A repair quote costs more than every case I've ever bought combined.",
+        "Thin and protective used to be a trade-off. It isn't anymore.",
     ],
     "TECH_DESK": [
         "One bag instead of digging through a drawer of tangled cables.",
         "If your desk eats every cable you own, this is why.",
         "Packing tech used to mean forgetting exactly one essential thing.",
+        "I've bought the same charger three times because I couldn't find it.",
+        "The drawer isn't messy, it just has no system at all.",
+        "Five minutes of packing turns into twenty when nothing has a place.",
     ],
 }
 
