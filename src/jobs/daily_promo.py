@@ -156,7 +156,26 @@ def run(count: int = 2, skip_tiktok: bool = False, skip_instagram: bool = False,
                 print(f"  ! Instagram fallito per {video_id}: {exc}")
                 entry["instagram_error"] = str(exc)
 
-        if not skip_youtube and youtube_uploaded < youtube_limit:
+        # Credenziali YouTube specifiche del brand, controllate PRIMA del
+        # retry loop (2026-08-04). Bug reale: youtube_uploaded si incrementa
+        # solo sui successi, quindi se il brand non ha le credenziali YouTube
+        # (es. Beffante appena sbloccato su TikTok ma non ancora su YouTube)
+        # "youtube_uploaded < youtube_limit" resta vero per sempre e OGNI
+        # prodotto della run tentava 3 volte con 90s di pausa tra un
+        # tentativo e l'altro - fino a 180s sprecati per prodotto, ad ogni
+        # run (6 volte al giorno), su un KeyError immediato che nessun retry
+        # puo' risolvere. Il retry ha senso per errori di quota/rete
+        # transitori (per cui e' nato), non per credenziali mancanti.
+        has_youtube_creds = all(os.environ.get(f"YOUTUBE_{brand}_{k}") for k in ("CLIENT_ID", "CLIENT_SECRET", "REFRESH_TOKEN"))
+        if not skip_youtube and not has_youtube_creds:
+            # if/elif/elif unico, non due if separati (2026-08-04): con due
+            # if indipendenti l'elif del ramo "limite raggiunto" piu' sotto si
+            # legava comunque a questo caso, stampando ANCHE un messaggio
+            # sbagliato ("limite di N/run gia' raggiunto") quando il vero
+            # motivo era l'assenza di credenziali - trovato rileggendo la
+            # catena invece di fidarmi che l'aggiunta fosse isolata.
+            print(f"  - YouTube: {brand} senza credenziali YouTube ancora - salto senza ritentare (resta su TikTok/Instagram)")
+        elif not skip_youtube and has_youtube_creds and youtube_uploaded < youtube_limit:
             # Costruito dall'HOOK e con "#shorts" garantito entro i 100
             # caratteri: prima partiva dalla caption intera (CTA + hashtag
             # Instagram inclusi), arrivava a 130-187 caratteri, YouTube
