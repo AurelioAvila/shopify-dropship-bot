@@ -113,6 +113,15 @@ SUBCATEGORY_KEYWORDS = {
     "TECH_CAR": ("car", "mount", "dashboard", "vent", "navigation", "bracket"),
     "TECH_CASE": ("case", "cover", "protective", "wallet", "card holder", "lanyard", "crossbody"),
     "TECH_DESK": ("organizer", "stand", "desk", "storage", "bag", "holder"),
+    # Beffante (2026-08-04): stesse quattro famiglie di prodotto che compongono
+    # HOME_KEYWORDS, ma separate per non ripetere lo stesso hook generico su
+    # una webcam, un proiettore e uno smartwatch - esattamente il difetto gia'
+    # risolto una volta per Groomlyco/Magdock.
+    "HOME_STREAMING": ("webcam", "computer camera", "web camera", "beauty camera", "fill light", "ring light"),
+    "HOME_SECURITY": ("security", "wifi camera", "home camera", "surveillance", "doorbell"),
+    "HOME_ENTERTAINMENT": ("projector", "speaker"),
+    "HOME_WEARABLE": ("smartwatch", "smart watch", "fitness tracker"),
+    "HOME_WORKSPACE": ("laptop", "power bank"),
 }
 
 SUBCATEGORY_HOOKS = {
@@ -223,6 +232,46 @@ SUBCATEGORY_HOOKS = {
         "I've bought the same charger three times because I couldn't find it.",
         "The drawer isn't messy, it just has no system at all.",
         "Five minutes of packing turns into twenty when nothing has a place.",
+    ],
+    "HOME_STREAMING": [
+        "If your laptop webcam makes you look like you're in a hostage video, this is for you.",
+        "Nobody tells you the built-in camera is the reason you look tired on every call.",
+        "This is the setup that made my streams look like a different channel.",
+        "The lighting was never the problem, the camera was.",
+        "I upgraded this and people asked what changed about my whole setup.",
+        "Every video call looked worse than it needed to, for one cheap reason.",
+    ],
+    "HOME_SECURITY": [
+        "I checked my home security footage and immediately ordered a second one.",
+        "POV: you finally see who rang the doorbell before opening the door.",
+        "Nobody mentions this until after a package goes missing once.",
+        "The peace of mind is worth more than the price tag.",
+        "I used to guess who was at the door. Now I just check my phone.",
+        "This caught something I never would have believed without the footage.",
+    ],
+    "HOME_ENTERTAINMENT": [
+        "The projector made movie night better than the actual cinema.",
+        "Anyone still watching movies on a laptop screen: this is for you.",
+        "One speaker changed how every party at my place feels.",
+        "I didn't expect a projector this size to actually be watchable.",
+        "This turned a blank wall into the best screen in the house.",
+        "The sound alone made the TV speakers feel pointless.",
+    ],
+    "HOME_WEARABLE": [
+        "Most smartwatches die by day three, this is the one that didn't.",
+        "I stopped checking my phone every five minutes once I got this.",
+        "Nobody tells you battery life is the only spec that actually matters.",
+        "This tracked something about my sleep I never would have noticed.",
+        "The one feature I thought was gimmicky turned out to be the best part.",
+        "I replaced my old one for a battery that didn't die by lunch.",
+    ],
+    "HOME_WORKSPACE": [
+        "If you work from home, this is the upgrade nobody suggests.",
+        "Anyone with a desk setup: this is the piece you're missing.",
+        "My laptop stopped dying mid-call once I fixed this one thing.",
+        "The cheap version breaks exactly when you need it most.",
+        "I tested this for a week before I believed it.",
+        "This costs less than what you're replacing every year.",
     ],
 }
 

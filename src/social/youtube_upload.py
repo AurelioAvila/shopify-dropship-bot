@@ -16,6 +16,7 @@ from googleapiclient.http import MediaFileUpload
 CATEGORY_IDS = {
     "GROOMLYCO": "26",  # Howto & Style (pet care)
     "MAGDOCK": "26",    # Howto & Style (tech accessories)
+    "BEFFANTE": "28",   # Science & Technology (proiettori/webcam/smart home)
 }
 
 

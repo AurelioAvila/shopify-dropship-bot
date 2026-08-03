@@ -50,11 +50,20 @@ NICHE_TITLES = {
         "{n} Car & Phone Upgrades That Fixed Daily Annoyances (2026)",
         "{n} Phone Accessories You'll Wish You Bought Sooner (2026)",
     ],
+    "BEFFANTE": [
+        "Top {n} Home Office & Smart Home Gadgets in 2026",
+        "{n} Desk Setup Upgrades That Are Actually Worth It (2026)",
+        "The {n} Home Tech Buys I Use Every Single Day (2026)",
+        "{n} Smart Home Gadgets That Fixed Daily Annoyances (2026)",
+        "{n} Home Office Gadgets You'll Wish You Bought Sooner (2026)",
+    ],
 }
 
 NICHE_KEYWORDS = {
     "GROOMLYCO": ("dog", "cat", "pet", "paw", "puppy", "leash", "collar", "grooming", "nail", "feeder", "treat", "kennel", "harness"),
     "MAGDOCK": ("phone", "magsafe", "wireless", "charger", "car mount", "holder", "cable", "usb", "earbuds", "watch", "stand", "mount"),
+    "BEFFANTE": ("projector", "webcam", "speaker", "smartwatch", "smart watch", "laptop", "power bank",
+                 "security", "computer camera", "web camera", "beauty camera", "wifi camera", "home camera", "fill light"),
 }
 
 _ORDINALS = ["First", "Second", "Third", "Fourth", "Fifth", "Sixth", "Seventh", "Eighth"]
@@ -148,6 +157,8 @@ TAG_POOLS = {
                   "#puppylove", "#petmusthaves", "#dogmom", "#petaccessories"],
     "MAGDOCK": ["#techaccessories", "#phoneaccessories", "#caraccessories",
                 "#techtok", "#lifehack", "#gadgets", "#magsafe", "#deskaesthetic"],
+    "BEFFANTE": ["#homeoffice", "#desksetup", "#smarthome", "#techfinds",
+                 "#gadgets", "#workfromhome", "#techtok", "#homegadgets"],
 }
 
 
@@ -181,7 +192,7 @@ def publish(brand: str, video_path: str, n_products: int) -> str:
     # canale viene verificato in futuro), ma nel frattempo brucia lo stesso
     # design nei primi secondi del video: qualunque fotogramma YouTube scelga
     # come copertina automatica in quella finestra E' il design voluto.
-    from thumbnail import bake_thumbnail_card
+    from src.thumbnail import bake_thumbnail_card
     try:
         bake_thumbnail_card(video_path, title, brand=brand)
     except Exception as exc:
@@ -197,11 +208,27 @@ def publish(brand: str, video_path: str, n_products: int) -> str:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--brand", required=True, choices=["groomlyco", "magdock"])
+    parser.add_argument("--brand", required=True, choices=["groomlyco", "magdock", "beffante"])
     parser.add_argument("-n", type=int, default=6, help="Quanti prodotti includere nella countdown")
     args = parser.parse_args()
 
     brand_upper = args.brand.upper()
+
+    # Guardia credenziali PRIMA di generare (2026-08-04). Senza, un brand
+    # non ancora collegato faceva tutto il lavoro pesante - chiamate CJ,
+    # rendering di 6 segmenti video, concatenazione, diversi minuti di CPU -
+    # per poi morire con KeyError sulla prima variabile d'ambiente mancante
+    # al momento dell'upload. Stessa logica gia' presente in daily_promo.py.
+    # Serve anche ai brand gia' attivi: se un token venisse revocato, meglio
+    # accorgersene in due secondi che dopo un render completo.
+    required = [f"YOUTUBE_{brand_upper}_CLIENT_ID",
+                f"YOUTUBE_{brand_upper}_CLIENT_SECRET",
+                f"YOUTUBE_{brand_upper}_REFRESH_TOKEN"]
+    missing = [k for k in required if not os.environ.get(k)]
+    if missing:
+        print(f"[{brand_upper}] credenziali YouTube mancanti ({', '.join(missing)}) - salto senza generare nulla.")
+        raise SystemExit(0)
+
     result = generate(brand_upper, args.n)
     if result:
         path, actual_n = result

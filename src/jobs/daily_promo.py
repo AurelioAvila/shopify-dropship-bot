@@ -193,6 +193,26 @@ def run(count: int = 2, skip_tiktok: bool = False, skip_instagram: bool = False,
         elif not skip_youtube:
             print(f"  - YouTube: limite di {youtube_limit}/run gia' raggiunto, salto per {video_id} (resta su IG/TikTok)")
 
+        # Robustezza (2026-08-04, in vista dell'attivazione di Beffante con
+        # credenziali social nuove/eventualmente incomplete): prima, se TUTTE
+        # le piattaforme fallivano (es. una env var mancante o un token non
+        # ancora valido), il prodotto veniva comunque segnato "promosso" nel
+        # log e non veniva mai piu' ritentato - un brand con credenziali rotte
+        # avrebbe silenziosamente bruciato l'intero catalogo pubblicando zero
+        # contenuti. Ora si consuma il prodotto solo se e' stato pubblicato
+        # davvero da almeno una piattaforma tra quelle NON esplicitamente
+        # saltate (skip_* e' un dry-run intenzionale, non un fallimento).
+        attempted = not (skip_tiktok and skip_instagram and skip_youtube)
+        any_success = (
+            (not skip_tiktok and entry.get("tiktok") == "ok (bozza)")
+            or (not skip_instagram and "instagram_media_id" in entry)
+            or (not skip_youtube and "youtube_id" in entry)
+        )
+        if attempted and not any_success:
+            print(f"  ! {pid} ({title}): fallito su TUTTE le piattaforme tentate, non segnato come promosso - verra' ritentato al prossimo giro")
+            time.sleep(20)
+            continue
+
         # pausa tra un prodotto e l'altro per non fare burst di upload
         # ravvicinati su YouTube (causa probabile del rate-limit visto)
         time.sleep(20)

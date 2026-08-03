@@ -51,6 +51,10 @@ from src.tts import generate_audio_with_timing
 FOOTAGE_QUERIES = {
     "PET": ["dog playing home", "puppy owner lifestyle", "dog grooming", "pet care home"],
     "TECH": ["phone accessories desk", "smartphone lifestyle", "tech desk setup", "car dashboard phone"],
+    # Beffante (2026-08-04): senza questa entry ricadrebbe su FOOTAGE_QUERIES
+    # ["TECH"], tutto incentrato su telefono/auto - non coerente con
+    # proiettori/webcam/videosorveglianza/casa intelligente.
+    "HOME": ["home office setup", "video call laptop webcam", "smart home technology", "cozy living room evening"],
 }
 
 

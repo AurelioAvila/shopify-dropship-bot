@@ -27,6 +27,7 @@ FONT_PATH = os.path.join(os.path.dirname(__file__), "..", "assets", "fonts", "Po
 BRAND_COLORS = {
     "GROOMLYCO": (255, 149, 64),   # arancio caldo, coerente col mondo pet
     "MAGDOCK": (0, 176, 255),      # azzurro tech
+    "BEFFANTE": (128, 48, 220),    # viola elettrico, stesso logo/palette del brand
 }
 DEFAULT_COLOR = (255, 193, 7)
 
