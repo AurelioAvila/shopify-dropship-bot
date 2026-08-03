@@ -13,6 +13,40 @@ from src.clients.cj_client import CJClient
 from src.clients.shopify_client import ShopifyClient
 from src.store import get_conn
 
+# Fix 2026-08-03: create_product() accettava gia' un parametro vendor, ma
+# questo job non lo passava mai - ogni prodotto veniva creato col default
+# "Dropship", senza alcuna distinzione di brand. Scoperto durante un audit
+# sul negozio pubblico: tutti i 116 prodotti esistenti avevano vendor
+# "Dropship", quindi non poteva esistere una collezione per brand (ne' per
+# Groomlyco ne' per Magdock) e il link "shop below" di entrambi gli account
+# Instagram portava alla stessa homepage con prodotti pet e tech mischiati.
+# Quel batch e' stato riclassificato una tantum a mano; questa e' la
+# correzione strutturale perche' non debba succedere di nuovo sui prossimi
+# import. Stesse keyword gia' verificate sull'intero catalogo esistente
+# (116/116 classificati, 0 ambigui) - vedi memoria
+# "feedback_store_branding_and_collections_fix".
+PET_KEYWORDS = ("dog", "cat", "pet")
+TECH_KEYWORDS = (
+    "magsafe", "phone", "wireless car", "webcam", "camera", "usb", "bluetooth",
+    "power bank", "laptop", "projector", "speaker", "smart watch",
+    "cable organizer", "dash cam", "car seat", "car mount", "trunk",
+)
+
+
+def classify_vendor(keyword: str, title: str) -> str:
+    """Groomlyco per prodotti pet, Magdock per prodotti tech - stessa logica
+    (e stesse keyword) usate per la riclassificazione una tantum del
+    catalogo esistente. 'Dropship' resta il fallback esplicito per un
+    prodotto che non rientra in nessuna delle due nicchie, cosi' resta
+    visibile/riconoscibile invece di finire silenziosamente in un brand
+    sbagliato."""
+    text = f"{keyword} {title}".lower()
+    if any(k in text for k in PET_KEYWORDS):
+        return "Groomlyco"
+    if any(k in text for k in TECH_KEYWORDS):
+        return "Magdock"
+    return "Dropship"
+
 
 def compute_sell_price(cost: float) -> float:
     markup = cost * (1 + config.MARKUP_PERCENT / 100)
@@ -45,6 +79,7 @@ def import_keyword(keyword: str, limit: int = 10) -> None:
             continue
 
         sell_price = compute_sell_price(cost)
+        vendor = classify_vendor(keyword, title)
 
         product = shopify.create_product(
             title=title,
@@ -52,6 +87,7 @@ def import_keyword(keyword: str, limit: int = 10) -> None:
             price=sell_price,
             image_urls=images,
             product_type=keyword,
+            vendor=vendor,
         )
         shopify_variant = product["variants"][0]
 
@@ -72,7 +108,7 @@ def import_keyword(keyword: str, limit: int = 10) -> None:
             ),
         )
         conn.commit()
-        print(f"  + importato: {title} | costo {cost:.2f} -> vendita {sell_price:.2f}")
+        print(f"  + importato [{vendor}]: {title} | costo {cost:.2f} -> vendita {sell_price:.2f}")
 
     conn.close()
 
