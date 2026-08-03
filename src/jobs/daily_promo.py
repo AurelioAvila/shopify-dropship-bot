@@ -20,6 +20,7 @@ import argparse
 import json
 import os
 import time
+from datetime import datetime
 
 from src.clients.cj_client import CJClient
 from src.clients.shopify_client import ShopifyClient
@@ -44,6 +45,15 @@ BRAND_BY_NICHE = {
     "TECH": "MAGDOCK",
     "HOME": "BEFFANTE",
 }
+
+# Vedi commento sulla guardia di partenza posticipata qui sotto in run().
+BRAND_LAUNCH_AFTER = {
+    "BEFFANTE": datetime(2026, 8, 4, 15, 0),
+}
+
+
+def _now() -> datetime:
+    return datetime.now()
 
 
 def _load_log() -> list:
@@ -159,6 +169,17 @@ def run(count: int = 2, skip_tiktok: bool = False, skip_instagram: bool = False,
 
         script, niche, hook = build_script_for_product(title)
         brand = BRAND_BY_NICHE[niche]
+
+        # Partenza posticipata per brand (2026-08-03): richiesta esplicita
+        # dell'utente per Beffante, appena collegato - vuole aspettare fino a
+        # domani 15:00 prima della prima pubblicazione reale, per non farlo
+        # bannare partendo subito a raffica lo stesso giorno del collegamento
+        # account. Non segnato come promosso, cosi' viene ripreso al primo
+        # giro utile dopo l'orario.
+        launch_after = BRAND_LAUNCH_AFTER.get(brand)
+        if launch_after and _now() < launch_after:
+            print(f"  - {pid} ({title}): {brand} partira' alle {launch_after}, salto per ora (non segnato come promosso)")
+            continue
 
         # Guardia 2026-08-04: Beffante (3o brand) non ha ancora credenziali
         # social configurate (account creati ma token non ancora collegati).
