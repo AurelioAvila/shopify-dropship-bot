@@ -44,7 +44,14 @@ _SHARE_CTAS = [
     f"Send this to a friend who'd actually use it. {_SHOP_TEXT} 🛒",
 ]
 
+# Nota sui pattern di hook (aggiornato 2026-08-03): i test 2026 su 30 hook
+# virali danno solo 4 famiglie sopra quota 70 - Identity Call, Contrarian
+# Strike, Open Loop, Confession - con Identity Call primo assoluto (85 di
+# media) perche' nomina in faccia il pubblico a cui parla. Mancava del tutto
+# in entrambe le nicchie, aggiunto ora.
 PET_HOOKS = [
+    "If you have a dog that sheds all year, this one's for you.",
+    "Golden retriever owners already know where this is going.",
     "If your dog hates this every single time, you're probably doing it wrong.",
     "Nobody tells you this before you get a dog, until it's too late.",
     "This is the mistake almost every dog owner makes without realizing it.",
@@ -60,6 +67,8 @@ PET_RESOLUTIONS = [
 ]
 
 TECH_HOOKS = [
+    "If you drive with your phone on the dashboard, watch this.",
+    "iPhone users with a MagSafe case: this is the part nobody mentions.",
     "The difference between cheap and good only shows up when it's already too late.",
     "I stress-tested this so you don't have to.",
     "Your phone keeps sliding every time you brake, and there's a reason for that.",
