@@ -39,15 +39,30 @@ class CJClient:
     def _headers(self) -> dict:
         return {"CJ-Access-Token": self._get_token(), "Content-Type": "application/json"}
 
-    def _request(self, method: str, url: str, max_retries: int = 5, **kwargs) -> requests.Response:
-        """Chiama l'API CJ ritentando in automatico sui 429 (rate limit stretto lato CJ)."""
+    def _request(self, method: str, url: str, max_retries: int = 8, **kwargs) -> requests.Response:
+        """Chiama l'API CJ ritentando in automatico sui 429 (rate limit stretto lato CJ).
+
+        max_retries alzato da 5 a 8 e attesa limitata a 30s (2026-08-03).
+        Con 5 tentativi il backoff esponenziale puro (1,2,4,8,16) si arrendeva
+        dopo ~31 secondi totali: troppo poco quando due job CJ girano davvero
+        insieme, e il job falliva del tutto. Verificato su un fallimento reale
+        (ShopifyDropshipDailyPromoEvening, 2026-08-03: HTTPError 429 dopo aver
+        esaurito tutti i tentativi).
+
+        La causa principale era comunque una collisione di ORARI - tre task
+        pianificati tutti alle 11:00 - risolta separandoli; questo resta come
+        difesa in profondita' per i casi di sovrapposizione occasionale.
+
+        Il tetto a 30s evita che il backoff esploda a 128s+ e faccia sforare
+        il tempo del job senza mai riprovare davvero.
+        """
         for attempt in range(max_retries):
             resp = self.session.request(method, url, headers=self._headers(), **kwargs)
             if resp.status_code != 429:
                 resp.raise_for_status()
                 return resp
-            wait = float(resp.headers.get("Retry-After", 2 ** attempt))
-            print(f"    (rate limit CJ, riprovo tra {wait:.0f}s...)")
+            wait = min(float(resp.headers.get("Retry-After", 2 ** attempt)), 30.0)
+            print(f"    (rate limit CJ, riprovo tra {wait:.0f}s... tentativo {attempt + 1}/{max_retries})")
             time.sleep(wait)
         resp.raise_for_status()
         return resp
