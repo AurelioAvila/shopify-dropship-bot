@@ -175,6 +175,18 @@ def publish(brand: str, video_path: str, n_products: int) -> str:
     except Exception as exc:
         print(f"  ! miniatura non generata ({exc}) - si prosegue senza")
 
+    # Groomlyco e Magdock non hanno il telefono verificato (confermato
+    # 2026-08-03, l'API rifiuta sempre thumbnails.set con 403) - upload_video
+    # tenta comunque via API (gratis, senza rischio, funziona da solo se il
+    # canale viene verificato in futuro), ma nel frattempo brucia lo stesso
+    # design nei primi secondi del video: qualunque fotogramma YouTube scelga
+    # come copertina automatica in quella finestra E' il design voluto.
+    from thumbnail import bake_thumbnail_card
+    try:
+        bake_thumbnail_card(video_path, title, brand=brand)
+    except Exception as exc:
+        print(f"  ! card iniziale non bruciata ({exc}) - si prosegue senza")
+
     # I tag dell'API sono un canale diverso dagli hashtag visibili: qui vanno
     # senza '#' e conviene usarli tutti (il campo regge ~500 caratteri), non
     # solo i primi due.
