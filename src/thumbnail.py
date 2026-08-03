@@ -161,18 +161,41 @@ def _probe_dimensions(video_path: str):
         return None
 
 
+def _probe_duration(video_path: str):
+    import subprocess
+
+    try:
+        out = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "default=nw=1:nk=1", video_path],
+            check=True, capture_output=True, timeout=30, text=True,
+        ).stdout.strip()
+        return float(out)
+    except Exception:
+        return None
+
+
 def bake_thumbnail_card(video_path: str, title: str, brand: str = None, card_seconds: float = 4.0) -> bool:
-    """Sovrappone una card col titolo in grande nei primi CARD_SECONDS
-    secondi del video, IN PLACE - aggira il blocco delle miniature
+    """Sovrappone una card col titolo in grande in TRE punti del video
+    (inizio, meta', quasi-fine), IN PLACE - aggira il blocco delle miniature
     personalizzate su un canale senza telefono verificato.
 
     Perche' esiste (2026-08-03): confermato live che Groomlyco e Magdock
     hanno entrambi questo blocco (403 "insufficient permissions" su
     thumbnails.set), quindi upload_thumbnail sotto fallisce sempre. YouTube
     sceglie allora un fotogramma a caso del video come copertina - senza
-    alcun rapporto col titolo. Bruciando il design nei primi secondi del
-    video stesso, qualunque fotogramma YouTube scelga in quella finestra E'
-    il design voluto, senza bisogno di nessun permesso.
+    alcun rapporto col titolo.
+
+    STORIA DEL FIX (importante, non ripetere l'errore): la prima versione
+    bruciava la card SOLO nei primi 4 secondi, sull'assunto che YouTube
+    scegliesse un fotogramma iniziale. Verificato falso su tre video
+    REALMENTE pubblicati lo stesso giorno (wty4tUagwLc, Bc_70utR6Gg,
+    pyJE_gTUuO4): la copertina automatica mostrava sempre un fotogramma a
+    caso da tutt'altra parte del video, mai la card. Bruciarla in TRE
+    finestre (inizio/meta'/quasi-fine) copre molte piu' posizioni possibili
+    per lo stesso costo proporzionale. Non e' una garanzia (l'algoritmo di
+    selezione di YouTube non e' documentato pubblicamente), ma una copertura
+    molto piu' ampia della singola finestra gia' dimostrata insufficiente.
 
     A DIFFERENZA di build_thumbnail (sempre 1280x720, il formato richiesto
     dall'API): qui la card viene generata alla RISOLUZIONE REALE del video
@@ -193,6 +216,13 @@ def bake_thumbnail_card(video_path: str, title: str, brand: str = None, card_sec
         return False
     w, h = dims
 
+    duration = _probe_duration(video_path)
+    if not duration or duration <= card_seconds * 2:
+        windows = [0.0]
+    else:
+        windows = [0.0, duration * 0.5, max(0.0, duration - card_seconds - 2.0)]
+    enable_expr = "+".join(f"between(t,{win:.2f},{win + card_seconds:.2f})" for win in windows)
+
     tmp_dir = os.path.dirname(os.path.abspath(video_path)) or "."
     card_path = os.path.join(tmp_dir, "_thumb_card.jpg")
     tmp_video = video_path + ".card.mp4"
@@ -202,7 +232,7 @@ def bake_thumbnail_card(video_path: str, title: str, brand: str = None, card_sec
 
         cmd = [
             "ffmpeg", "-y", "-i", video_path, "-i", card_path,
-            "-filter_complex", f"[0:v][1:v]overlay=0:0:enable='between(t,0,{card_seconds})'[v]",
+            "-filter_complex", f"[0:v][1:v]overlay=0:0:enable='{enable_expr}'[v]",
             "-map", "[v]", "-map", "0:a",
             "-c:v", "libx264", "-preset", "medium", "-b:v", "8000k",
             "-c:a", "copy",
