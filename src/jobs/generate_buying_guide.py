@@ -18,6 +18,7 @@ import argparse
 import os
 import random
 import subprocess
+from datetime import datetime
 
 from src.clients.cj_client import CJClient
 from src.render_promo import LowResolutionError, build_promo_video
@@ -227,6 +228,23 @@ if __name__ == "__main__":
     missing = [k for k in required if not os.environ.get(k)]
     if missing:
         print(f"[{brand_upper}] credenziali YouTube mancanti ({', '.join(missing)}) - salto senza generare nulla.")
+        raise SystemExit(0)
+
+    # Guardia di partenza posticipata (2026-08-04). Bug reale evitato PRIMA
+    # di pubblicare: questo script e' un job SEPARATO da daily_promo.py, che
+    # ha gia' un posticipo esplicito per Beffante (richiesta utente: aspettare
+    # fino a domani 15:00 prima della prima pubblicazione reale, per non far
+    # sembrare l'account sospetto pubblicando subito dopo la creazione) - ma
+    # generate_buying_guide.py non lo conosceva affatto. Il task
+    # ShopifyBuyingGuideBeffante e' schedulato domani alle 11:20, quindi
+    # SENZA questo controllo avrebbe pubblicato un video lungo 3h40 PRIMA del
+    # limite voluto, aggirando il posticipo dall'altra porta. Importa la
+    # stessa mappa da daily_promo.py invece di duplicare la data altrove: due
+    # copie della stessa scadenza possono divergere.
+    from src.jobs.daily_promo import BRAND_LAUNCH_AFTER
+    launch_after = BRAND_LAUNCH_AFTER.get(brand_upper)
+    if launch_after and datetime.now() < launch_after:
+        print(f"[{brand_upper}] partira' alle {launch_after} - salto senza generare nulla per ora.")
         raise SystemExit(0)
 
     result = generate(brand_upper, args.n)
