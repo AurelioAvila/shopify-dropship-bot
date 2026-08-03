@@ -61,9 +61,20 @@ FOOTAGE_QUERIES = {
 def _generate_bg_music(path: str, duration: float) -> None:
     """Sottofondo strumentale sintetizzato (accordo soffuso, nessun sample
     esterno - stesso approccio gia' usato per CertSprint, evita ogni rischio
-    di copyright). Volume molto basso sotto la voce, con un lento crescendo.
-    Prima non c'era nessuna musica su questi video, solo voce - la aggiungiamo
-    per dare piu' produzione senza mai coprire il parlato."""
+    di copyright).
+
+    LIVELLO CORRETTO 2026-08-04 (era volume=0.05, misurato INUDIBILE su
+    youtube-shorts-bot/solofounded-bot con lo stesso identico valore copiato
+    proprio da qui: -53 dB contro i -21.5 dB della voce TTS, cioe' 32 dB
+    sotto - aggiungerlo cambiava il volume del mix di 0.0 dB. Musica che non
+    si sente non e' musica. 0.18 porta il sottofondo a ~21 dB sotto la voce,
+    dentro lo standard 15-25 dB per musica sotto narrazione.
+
+    TREMOLO: un accordo di sinusoidi tenuto fisso e' un drone, e a volume
+    finalmente udibile un drone fisso stanca piu' del silenzio - una
+    modulazione lenta (0.25 Hz, un ciclo ogni 4s) lo fa "respirare".
+    Questo bug/fix riguarda TUTTI E TRE i brand (Groomlyco/Magdock/Beffante):
+    e' la stessa funzione condivisa, non serve differenziare per brand."""
     fade_in = min(duration * 0.4, 6.0)
     fade_out = min(duration * 0.15, 2.0)
     fade_out_start = max(duration - fade_out, 0.0)
@@ -74,7 +85,8 @@ def _generate_bg_music(path: str, duration: float) -> None:
     cmd += [
         "-filter_complex",
         f"amix=inputs={len(notes)}:duration=longest,"
-        f"volume=0.05,"
+        f"volume=0.18,"
+        f"tremolo=f=0.25:d=0.35,"
         f"afade=t=in:st=0:d={fade_in:.3f},"
         f"afade=t=out:st={fade_out_start:.3f}:d={fade_out:.3f}",
         str(path),

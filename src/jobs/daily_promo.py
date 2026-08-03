@@ -61,6 +61,9 @@ def _append_log(entry: dict) -> None:
 
 
 def _all_fresh_pids() -> list:
+    """Prodotti non ancora promossi, in ordine FIFO puro (vecchio comportamento,
+    tenuto come fallback - vedi _all_fresh_pids_fair sotto per quello usato
+    davvero)."""
     conn = get_conn()
     all_pids = [r[0] for r in conn.execute("SELECT DISTINCT cj_pid FROM product_map").fetchall()]
     conn.close()
@@ -69,13 +72,71 @@ def _all_fresh_pids() -> list:
     return [pid for pid in all_pids if pid not in done_pids]
 
 
+def _pid_to_brand_map() -> dict:
+    """cj_pid -> vendor Shopify (Groomlyco/Magdock/Beffante), con UNA sola
+    chiamata Shopify (list_products, tutto il catalogo in una pagina) invece
+    di richiedere il dettaglio CJ per ogni singolo pid - quello e' gia' il
+    passo lento/rate-limitato che il resto del job fa dopo, per i soli
+    candidati davvero scelti."""
+    try:
+        shopify = ShopifyClient()
+        products = shopify.list_products()
+    except Exception as exc:
+        print(f"  ! impossibile leggere i vendor da Shopify ({exc}) - ordine FIFO come fallback")
+        return {}
+
+    vendor_by_shopify_id = {str(p["id"]): p.get("vendor", "?") for p in products}
+
+    conn = get_conn()
+    rows = conn.execute("SELECT cj_pid, shopify_product_id FROM product_map").fetchall()
+    conn.close()
+    return {cj_pid: vendor_by_shopify_id.get(str(shopify_id), "?") for cj_pid, shopify_id in rows}
+
+
+def _all_fresh_pids_fair() -> list:
+    """Prodotti non ancora promossi, interlacciati per BRAND invece che in
+    puro ordine di inserimento nel database.
+
+    PERCHE' ESISTE (2026-08-04): con l'ordine FIFO puro, i prodotti Beffante
+    (inseriti per ultimi, il 3o brand lanciato) finivano sistematicamente in
+    fondo alla coda - verificato: 48 prodotti Groomlyco/Magdock ancora
+    "freschi" li precedevano tutti. A count=1/run * 6 run/giorno (il ritmo
+    reale di questo job), Beffante avrebbe aspettato ~8 giorni prima del
+    PRIMO video, contro la richiesta esplicita dell'utente di pubblicazione
+    quotidiana su tutti e 3 i brand fin da subito.
+
+    L'interlacciamento round-robin (un prodotto per brand a turno) garantisce
+    che ogni run peschi da brand diversi invece di esaurire prima i piu'
+    vecchi. Se un brand esaurisce i suoi prodotti freschi, si salta al giro
+    successivo senza bloccare gli altri.
+    """
+    fifo = _all_fresh_pids()
+    if not fifo:
+        return fifo
+
+    brand_of = _pid_to_brand_map()
+    if not brand_of:
+        return fifo  # fallback: lettura vendor fallita, meglio FIFO che niente
+
+    by_brand = {}
+    for pid in fifo:
+        by_brand.setdefault(brand_of.get(pid, "?"), []).append(pid)
+
+    interleaved = []
+    while any(by_brand.values()):
+        for brand in list(by_brand.keys()):
+            if by_brand[brand]:
+                interleaved.append(by_brand[brand].pop(0))
+    return interleaved
+
+
 def run(count: int = 2, skip_tiktok: bool = False, skip_instagram: bool = False, skip_youtube: bool = False,
         youtube_limit: int = 3) -> None:
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     cj = CJClient()
     shopify = ShopifyClient()
 
-    candidates = _all_fresh_pids()
+    candidates = _all_fresh_pids_fair()
     if not candidates:
         print("Nessun prodotto nuovo da promuovere: tutto il catalogo e' gia' stato coperto.")
         print("Serve importare nuovi prodotti (src/jobs/import_products.py) per continuare.")
