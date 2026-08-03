@@ -33,6 +33,18 @@ from src.store import get_conn
 OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data", "promo_videos")
 LOG_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "data", "promo_content_log.json")
 
+# Terzo brand (Beffante, tech da casa/scrivania) aggiunto 2026-08-03.
+# Il rilevamento nicchia di promo_scripts.py ora e' a tre valori
+# (PET/TECH/HOME) e instrada da solo sul brand giusto, quindi il blocco
+# temporaneo che saltava questi prodotti non serve piu': la lista di parole
+# chiave vive solo in promo_scripts.HOME_KEYWORDS, per non tenerne due copie
+# che possono divergere.
+BRAND_BY_NICHE = {
+    "PET": "GROOMLYCO",
+    "TECH": "MAGDOCK",
+    "HOME": "BEFFANTE",
+}
+
 
 def _load_log() -> list:
     if not os.path.exists(LOG_PATH):
@@ -77,6 +89,7 @@ def run(count: int = 2, skip_tiktok: bool = False, skip_instagram: bool = False,
 
         detail = cj.get_product_detail(pid)
         title = detail.get("productNameEn") or "New product"
+
         images = detail.get("productImageSet") or ([detail["bigImage"]] if detail.get("bigImage") else [])
         if not images:
             print(f"  ! {pid} ({title}): nessuna immagine, salto")
@@ -84,7 +97,19 @@ def run(count: int = 2, skip_tiktok: bool = False, skip_instagram: bool = False,
             continue
 
         script, niche, hook = build_script_for_product(title)
-        brand = "GROOMLYCO" if niche == "PET" else "MAGDOCK"
+        brand = BRAND_BY_NICHE[niche]
+
+        # Guardia 2026-08-04: Beffante (3o brand) non ha ancora credenziali
+        # social configurate (account creati ma token non ancora collegati).
+        # Senza questo controllo, il prodotto verrebbe "consumato" dal
+        # rendering (spreco di tempo/CJ calls) e segnato come promosso nel
+        # log anche se nessuna pubblicazione reale va a buon fine su nessuna
+        # piattaforma - non lo segniamo come fatto, cosi' viene ripreso in
+        # automatico appena le credenziali esistono, invece di essere perso.
+        if not os.environ.get(f"INSTAGRAM_{brand}_ACCESS_TOKEN") and not os.environ.get(f"TIKTOK_{brand}_CLIENT_KEY"):
+            print(f"  - {pid} ({title}): brand {brand} senza credenziali social ancora - salto per ora (non segnato come promosso)")
+            continue
+
         video_id = f"auto-{int(time.time())}-{pid[-6:]}"
         output_path = os.path.join(OUTPUT_DIR, f"{video_id}.mp4")
         tmp_dir = os.path.join(OUTPUT_DIR, f"_tmp_{video_id}")

@@ -21,6 +21,18 @@ TECH_KEYWORDS = (
     "phone", "magsafe", "wireless", "charger", "car mount", "holder",
     "cable", "usb", "earbuds", "watch", "stand", "mount",
 )
+# Terzo brand (Beffante, 2026-08-03): tech "da casa/scrivania" - proiettori,
+# webcam, speaker, smartwatch, power bank, videosorveglianza. Confina con
+# Magdock, che invece resta sugli accessori PER TELEFONO: per questo va
+# testato PRIMA di TECH in _detect_niche, altrimenti parole come "watch" o
+# "speaker" lo dirotterebbero su Magdock (account e token sbagliati).
+# Questa e' la lista canonica: src/jobs/daily_promo.py la importa da qui
+# invece di tenerne una copia propria, cosi' le due non possono divergere.
+HOME_KEYWORDS = (
+    "projector", "webcam", "speaker", "smartwatch", "smart watch",
+    "laptop", "power bank", "security", "computer camera", "web camera",
+    "beauty camera", "wifi camera", "home camera", "fill light",
+)
 
 _CTA = "Shop the link in our bio 🛒"
 
@@ -215,9 +227,19 @@ SUBCATEGORY_HOOKS = {
 }
 
 
+_SUBCATEGORY_PREFIX = {"PET": "PET_", "TECH": "TECH_", "HOME": "HOME_"}
+
+
 def _detect_subcategory(title: str, niche: str) -> str:
+    """Bug trovato 2026-08-04: prima del terzo brand (Beffante/HOME) questa
+    funzione usava 'prefix = PET_ if niche == PET else TECH_' - qualunque
+    niche diversa da PET cadeva su TECH_, quindi un prodotto HOME (es. una
+    webcam) veniva confrontato con le sottocategorie TECH_* e "usb"
+    (TECH_CHARGING) gli assegnava un hook su caricabatterie che si scaricano,
+    lo stesso tipo di incoerenza hook/prodotto gia' corretta una volta per
+    Groomlyco/Magdock. Ora ogni niche cerca solo nelle proprie sottocategorie."""
     t = title.lower()
-    prefix = "PET_" if niche == "PET" else "TECH_"
+    prefix = _SUBCATEGORY_PREFIX.get(niche, "TECH_")
     best, best_hits = None, 0
     for sub, keywords in SUBCATEGORY_KEYWORDS.items():
         if not sub.startswith(prefix):
@@ -232,6 +254,11 @@ def _detect_niche(title: str) -> str:
     t = title.lower()
     if any(k in t for k in PET_KEYWORDS):
         return "PET"
+    # HOME prima di TECH: le due si sovrappongono ("watch" -> smartwatch,
+    # "speaker", "camera") e il piu' specifico deve vincere, altrimenti i
+    # prodotti Beffante finirebbero pubblicati sull'account Magdock.
+    if any(k in t for k in HOME_KEYWORDS):
+        return "HOME"
     if any(k in t for k in TECH_KEYWORDS):
         return "TECH"
     return "PET" if random.random() < 0.5 else "TECH"
@@ -265,6 +292,32 @@ TECH_CLOSERS = [
     "One setup and it's done.",
     "Try it once and you'll see.",
 ]
+HOME_CLOSERS = [
+    "Look at the difference.",
+    "Watch what happens.",
+    "Save this for the next setup.",
+    "Send this to someone building a desk setup.",
+    "Plug it in once and forget about it.",
+    "Try it once and you'll see.",
+]
+
+# Beffante: tech da casa/scrivania. Stessi 4 pattern di hook che reggono nel
+# 2026 (Identity Call in testa, poi Contrarian/Open Loop/Confession), gia'
+# applicati a Groomlyco e Magdock.
+HOME_HOOKS = [
+    "If you work from home, this is the upgrade nobody suggests.",
+    "Anyone with a desk setup: this is the piece you're missing.",
+    "The cheap version breaks exactly when you need it most.",
+    "I tested this for a week before I believed it.",
+    "Nobody mentions this until after you've already bought the wrong one.",
+    "This costs less than what you're replacing every year.",
+]
+HOME_RESOLUTIONS = [
+    "Here's what actually works.",
+    "This changes the whole setup.",
+    "Here's the part nobody explains.",
+    "It solved it on the first try.",
+]
 
 
 def build_script_for_product(title: str) -> tuple:
@@ -276,10 +329,16 @@ def build_script_for_product(title: str) -> tuple:
     # Hook coerente col prodotto quando riconosciamo la sottocategoria,
     # altrimenti si ricade sul pool generico della nicchia.
     subcategory = _detect_subcategory(title, niche)
-    hook_pool = SUBCATEGORY_HOOKS.get(subcategory) or (PET_HOOKS if niche == "PET" else TECH_HOOKS)
+    _pools = {
+        "PET": (PET_HOOKS, PET_RESOLUTIONS, PET_CLOSERS),
+        "TECH": (TECH_HOOKS, TECH_RESOLUTIONS, TECH_CLOSERS),
+        "HOME": (HOME_HOOKS, HOME_RESOLUTIONS, HOME_CLOSERS),
+    }
+    default_hooks, resolutions, closers = _pools[niche]
+    hook_pool = SUBCATEGORY_HOOKS.get(subcategory) or default_hooks
     hook = random.choice(hook_pool)
-    resolution = random.choice(PET_RESOLUTIONS if niche == "PET" else TECH_RESOLUTIONS)
-    closer = random.choice(PET_CLOSERS if niche == "PET" else TECH_CLOSERS)
+    resolution = random.choice(resolutions)
+    closer = random.choice(closers)
     script = f"{hook} {resolution} {closer}"
     return script, niche, hook
 
@@ -291,11 +350,14 @@ def build_caption_for_product(title: str, niche: str, hook: str) -> str:
     # confermano che i post con hook in caption fanno 7-37% di engagement
     # contro 0-2.7% di quelli col solo nome prodotto. Ora la caption apre
     # con lo STESSO hook usato nel video invece di ignorarlo.
-    tag_pool = (
-        ["#dogsoftiktok", "#doggrooming", "#petcare", "#dogtok", "#puppylove"]
-        if niche == "PET"
-        else ["#techtok", "#phoneaccessories", "#lifehack", "#deskaesthetic", "#fyp"]
-    )
+    tag_pool = {
+        "PET": ["#dogsoftiktok", "#doggrooming", "#petcare", "#dogtok", "#puppylove"],
+        "TECH": ["#techtok", "#phoneaccessories", "#lifehack", "#deskaesthetic", "#fyp"],
+        # Beffante: tag di community reali sul tech da casa/scrivania. Niente
+        # #fyp qui - TikTok ha dichiarato che non incide sulla distribuzione,
+        # e su un account nuovo un tag da miliardi di view non emerge mai.
+        "HOME": ["#desksetup", "#homeoffice", "#techfinds", "#gadgets", "#workfromhome"],
+    }[niche]
     tags = " ".join(random.sample(tag_pool, 3))
     # ~50% delle volte usa una CTA orientata a save/share invece del solo
     # link - varieta' e allineamento al segnale di ranking piu' pesante,
