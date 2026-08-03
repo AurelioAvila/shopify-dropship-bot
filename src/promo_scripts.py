@@ -101,6 +101,29 @@ SUBCATEGORY_HOOKS = {
     # sono volutamente diversi tra loro (prima persona / conseguenza / POV /
     # momento specifico / mito da smontare) invece di variazioni della stessa
     # formula, che sarebbero varieta' solo apparente.
+    #
+    # Ricerca trend 2026-08-03 (routine di manutenzione, non audit): due
+    # sottocategorie hanno le KEYWORD piu' larghe dei loro HOOK, cioe'
+    # esattamente il difetto di coerenza che questo file dice di voler
+    # evitare (vedi commento sopra SUBCATEGORY_KEYWORDS).
+    #  - PET_FEEDING include "water"/"bottle"/"dispenser" tra le keyword, ma
+    #    tutti gli hook parlavano solo di velocita' nel mangiare/ciotole. Le
+    #    borracce/dispenser d'acqua portatili per cani sono indicate come
+    #    prodotto vincente 2026 da piu' fonti indipendenti: Zendrop
+    #    (https://www.zendrop.com/blog/dropshipping-pet-products/),
+    #    CJdropshipping (https://cjdropshipping.com/blogs/dropshipping-niches/Best-Dropshipping-Pet-Products),
+    #    PB Fulfill (https://pbfulfill.com/blogs/marketing-strategy/tiktok-viral-pet-products-to-dropship).
+    #    Se un prodotto del genere entra in catalogo, prima avrebbe ricevuto
+    #    un hook su "mangia troppo in fretta" incoerente col prodotto reale.
+    #  - TECH_CASE include "wallet"/"card holder"/"crossbody" tra le keyword,
+    #    e infatti 3 dei 6 prodotti Magdock gia' promossi in
+    #    data/promo_content_log.json sono case a portafoglio ("Flip Phone
+    #    Case Cover Card Wallet", "...Card Wallet Leather Case", "Card Fold
+    #    Skin Feeling Wallet Mobile Phone Case") - ma tutti gli hook
+    #    esistenti parlano solo di resistenza agli urti/cadute, non del vero
+    #    motivo per cui si compra una wallet case (smettere di portare un
+    #    portafoglio separato). Mismatch gia' capitato su video reali, non
+    #    ipotetico.
     "PET_GROOMING": [
         "If your dog hates this every single time, you're probably doing it wrong.",
         "This is the mistake almost every dog owner makes while grooming.",
@@ -117,6 +140,9 @@ SUBCATEGORY_HOOKS = {
         "My vet asked one question about mealtimes and it explained everything.",
         "Your dog isn't greedy, the bowl is just the wrong shape.",
         "The bloating scare cost me a night at the emergency vet.",
+        "He used to drink from puddles on every walk because I forgot water.",
+        "A thirsty dog on a hot walk is how a good afternoon turns into a vet visit.",
+        "Carrying an open cup of water for him never once worked.",
     ],
     "PET_COMFORT": [
         "If your dog can't settle in summer, it's not restlessness, it's the heat.",
@@ -165,6 +191,9 @@ SUBCATEGORY_HOOKS = {
         "Waist height onto tile is what actually breaks screens, not big falls.",
         "A repair quote costs more than every case I've ever bought combined.",
         "Thin and protective used to be a trade-off. It isn't anymore.",
+        "I stopped carrying a separate wallet the day I got one of these.",
+        "Losing my actual wallet twice in a year is what finally got me to switch.",
+        "Cards, cash, ID, one thing in my pocket instead of two.",
     ],
     "TECH_DESK": [
         "One bag instead of digging through a drawer of tangled cables.",
