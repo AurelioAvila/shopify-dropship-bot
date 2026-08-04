@@ -8,4 +8,9 @@ data/*.db
 data/promo_videos/_tmp_*/
 *TEMP_MPY*
 client_secret_*.json
-run_daily_promo.bat
+# Ogni run_*.bat di questo progetto puo' finire per contenere un token in
+# chiaro (successo gia' a run_daily_promo.bat, TELEGRAM_BOT_TOKEN) - il
+# pattern esplicito qui sotto copre anche i .bat non ancora scritti, invece
+# di rincorrerli uno per uno ogni volta che ne nasce uno nuovo (scoperto
+# 2026-08-04: run_sync_stock.bat era gia' fuori da questa protezione).
+run_*.bat
