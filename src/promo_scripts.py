@@ -104,7 +104,7 @@ TECH_RESOLUTIONS = [
 # un prodotto che non c'entra si sente ingannato e scrolla a meta' video:
 # retention distrutta proprio dove l'algoritmo la misura (checkpoint 3/10/20s).
 SUBCATEGORY_KEYWORDS = {
-    "PET_GROOMING": ("brush", "comb", "nail", "clipper", "shampoo", "bath", "deshedding", "hair remover", "grooming", "trimmer"),
+    "PET_GROOMING": ("brush", "comb", "nail", "clipper", "shampoo", "bath", "deshedding", "hair remover", "grooming", "trimmer", "paw", "paw cleaner", "paw wash"),
     "PET_FEEDING": ("feeder", "bowl", "food", "treat", "puzzle", "slow", "water", "bottle", "dispenser", "leakage"),
     "PET_COMFORT": ("bed", "mat", "pad", "cooling", "pillow", "blanket", "sleeping", "cushion"),
     "PET_WALKING": ("leash", "collar", "harness", "poop", "walking"),
@@ -154,6 +154,21 @@ SUBCATEGORY_HOOKS = {
     #    motivo per cui si compra una wallet case (smettere di portare un
     #    portafoglio separato). Mismatch gia' capitato su video reali, non
     #    ipotetico.
+    # Ricerca trend 2026-08-04 (routine di manutenzione): stesso difetto di
+    # coerenza gia' descritto sopra (PET_FEEDING/TECH_CASE), stavolta su una
+    # sottocategoria intera senza NESSUN hook adatto. "paw" e' gia' una
+    # keyword PET a livello di nicchia (PET_KEYWORDS, questo file) - un
+    # prodotto come "Portable Dog Paw Cleaner Cup" veniva quindi instradato
+    # correttamente su Groomlyco/PET, ma non c'era nessuna keyword "paw" nelle
+    # sottocategorie: zero hit su tutte, quindi ricadeva sul pool generico
+    # PET_HOOKS (shedding/comportamento) invece di uno sul vero motivo per
+    # cui si compra un lavapiedi per cani. I paw cleaner sono segnalati come
+    # prodotto vincente 2026, a basso rischio e facile da dimostrare in video
+    # brevi, da BuckyDrop
+    # (https://blog.buckydrop.com/trending-pet-products-dropshipping-2026/)
+    # e Zendrop (https://www.zendrop.com/blog/dropshipping-pet-products/).
+    # Aggiunta keyword "paw"/"paw cleaner"/"paw wash" a PET_GROOMING sopra e
+    # hook dedicati qui, invece di forzarli nel pool generico.
     "PET_GROOMING": [
         "If your dog hates this every single time, you're probably doing it wrong.",
         "This is the mistake almost every dog owner makes while grooming.",
@@ -162,6 +177,10 @@ SUBCATEGORY_HOOKS = {
         "Nobody tells you the groomer bill adds up to a holiday every year.",
         "The trick isn't holding him still, it's what you do before that.",
         "Ten minutes at home beats an hour of wrestling at the salon.",
+        "Muddy paws on the couch again, and it's always right after a walk.",
+        "Wiping four paws with a towel at the door never actually works.",
+        "The walk isn't the problem, the ninety seconds after you get home is.",
+        "If your dog tracks mud through the house after every single walk, this is why.",
     ],
     "PET_FEEDING": [
         "If your dog inhales dinner in nine seconds flat, that's a real problem.",
