@@ -597,11 +597,50 @@ def _make_caption_clip(text: str, start: float, duration: float):
     stroke_layer = TextClip(text, color="black", stroke_color="black", stroke_width=6, **common)
     fill_layer = TextClip(text, color="white", **common)
 
+    # Sfondo ADERENTE al testo invece della vecchia fascia larga (2026-08-05).
+    #
+    # Prima il contrasto era garantito da una ColorClip nera al 45% di
+    # opacita' alta il 22% del fotogramma, disegnata per tutta la durata del
+    # video: una fascia grigia perennemente stesa sul centro dell'immagine.
+    # Segnalato dall'utente come "video sbiaditi nelle scritte e negli
+    # sfondi", ed e' esattamente cosi': al 45% non copre abbastanza da far
+    # risaltare il testo, ma annebbia comunque un quinto del video, anche nei
+    # momenti in cui non c'e' nessuna didascalia da leggere.
+    #
+    # Ora ogni didascalia porta il proprio riquadro, alto quanto il testo e
+    # opaco al 78% - lo stesso valore della hook card, che infatti si legge
+    # nitida. Il testo guadagna contrasto E il video resta pulito, perche' lo
+    # scurimento riguarda solo la striscia realmente occupata dalle parole e
+    # solo mentre sono a schermo.
+    text_w, text_h = stroke_layer.size
+    backdrop = (
+        ColorClip(size=(text_w + 40, text_h + 28), color=(0, 0, 0))
+        .set_opacity(0.78)
+        .set_duration(duration)
+    )
+    # Il pop d'ingresso si applica SOLO al testo, non al gruppo intero.
+    #
+    # Applicare .resize(funzione-del-tempo) al composito che contiene lo
+    # sfondo ne DISTRUGGE la maschera di trasparenza: il riquadro scuro
+    # sparisce del tutto, lasciando il testo bianco nudo sopra il video.
+    # Verificato in isolamento il 2026-08-05 renderizzando la stessa
+    # didascalia con e senza resize - con il resize nessun riquadro, senza
+    # resize il riquadro c'e' ed e' corretto. E' un difetto noto di moviepy
+    # nel propagare la mask attraverso un resize animato, non del riquadro:
+    # infatti la hook card, che usa lo stesso identico schema ma NON viene
+    # ridimensionata, si e' sempre vista bene.
+    text_group = CompositeVideoClip(
+        [stroke_layer, fill_layer.set_position(("center", "center"))],
+        size=(text_w, text_h),
+    ).set_duration(duration).resize(_pop_scale).set_position(("center", "center"))
+
     clip = (
-        CompositeVideoClip([stroke_layer, fill_layer.set_position(("center", "center"))], size=stroke_layer.size)
+        CompositeVideoClip(
+            [backdrop, text_group],
+            size=(text_w + 40, text_h + 28),
+        )
         .set_start(start)
         .set_duration(duration)
-        .resize(_pop_scale)
         .set_position(("center", CAPTION_Y))
     )
     return clip
@@ -732,16 +771,12 @@ def build_promo_video(script_text: str, image_urls: list[str], output_path: str,
     hook_seconds = min(HOOK_CARD_SECONDS, duration) if hook else 0.0
     hook_clips = _make_hook_card(hook, hook_seconds) if hook else []
 
-    # La banda parte solo quando finisce l'hook card: durante l'apertura
-    # l'unico elemento grafico deve essere la card, altrimenti si vedono due
-    # riquadri scuri sovrapposti (verificato sul primo render di prova).
-    band = (
-        ColorClip(size=(TARGET_W, CAPTION_BAND_HEIGHT), color=(0, 0, 0))
-        .set_opacity(0.45)
-        .set_start(hook_seconds)
-        .set_duration(max(duration - hook_seconds, 0.1))
-        .set_position(("center", CAPTION_BAND_Y))
-    )
+    # La fascia larga semitrasparente e' stata RIMOSSA il 2026-08-05: ogni
+    # didascalia porta ora il proprio riquadro aderente al testo (vedi
+    # _make_caption_clip). La vecchia banda copriva il 22% del fotogramma al
+    # 45% di opacita' per tutta la durata del video - abbastanza da annebbiare
+    # l'immagine, non abbastanza da far risaltare le scritte: e' la causa dei
+    # "video sbiaditi" segnalati dall'utente.
     captions = _caption_clips_timed(word_timings, skip_before=hook_seconds)
 
     bg_music_path = output_path.replace(".mp4", "_bgmusic.mp3")
@@ -760,7 +795,7 @@ def build_promo_video(script_text: str, image_urls: list[str], output_path: str,
 
     full_audio = CompositeAudioClip([bg_music, audio, *whoosh_layers])
 
-    final = CompositeVideoClip([background, band, *captions, *hook_clips], size=(TARGET_W, TARGET_H)).set_audio(full_audio)
+    final = CompositeVideoClip([background, *captions, *hook_clips], size=(TARGET_W, TARGET_H)).set_audio(full_audio)
     # bitrate esplicito e alto: senza, moviepy/ffmpeg usa un default basso che
     # comprime pesantemente i bordi netti del testo (causa reale dello sfocato).
     final.write_videofile(
