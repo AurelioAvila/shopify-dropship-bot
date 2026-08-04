@@ -374,6 +374,47 @@ def _clean_shot_score(image_path: str) -> float:
 
 CLEAN_SHOT_MIN_SCORE = 0.55
 
+# Sopra questa frazione di righe "tipo testo" l'immagine e' un volantino, non
+# una foto prodotto. Tarata su immagini reali del catalogo: gli scatti puliti
+# stanno a 0.02-0.12, i volantini a 0.20-0.73. 0.18 lascia margine ai casi
+# limite (foto prodotto con una piccola dicitura) senza far passare i
+# volantini veri.
+MAX_TEXT_ROW_RATIO = 0.18
+
+
+def _text_row_ratio(image_path: str) -> float:
+    """Frazione di righe orizzontali che sembrano contenere TESTO.
+
+    Una riga che attraversa una scritta alterna molte volte chiaro e scuro
+    (i tratti delle lettere); una riga che attraversa una foto prodotto su
+    fondo liscio cambia poche volte. Serve a riconoscere i volantini CJ
+    costruiti su fondo bianco, che superano il controllo sulla cornice pur
+    essendo pieni di scritte e riquadri.
+    """
+    try:
+        im = PIL.Image.open(image_path).convert("L")
+        im.thumbnail((300, 300))
+        w, h = im.size
+        if w < 8 or h < 8:
+            return 0.0
+        px = im.load()
+        righe_testo = 0
+        for y in range(h):
+            transizioni = 0
+            prev = px[0, y] > 128
+            for x in range(1, w):
+                cur = px[x, y] > 128
+                if cur != prev:
+                    transizioni += 1
+                    prev = cur
+            if transizioni >= 12:
+                righe_testo += 1
+        return righe_testo / float(h)
+    except Exception:
+        # In caso di dubbio non si scarta: meglio un'immagine imperfetta che
+        # nessuna immagine (stessa filosofia delle guardie di _cutout_product).
+        return 0.0
+
 
 def select_clean_shots(local_images: list) -> list:
     """Tiene solo gli scatti puliti, in ordine di pulizia decrescente.
@@ -394,15 +435,36 @@ def select_clean_shots(local_images: list) -> list:
     """
     if not local_images:
         return local_images
-    scored = [(item, _clean_shot_score(item[0])) for item in local_images]
-    puliti = [item for item, s in sorted(scored, key=lambda x: -x[1]) if s >= CLEAN_SHOT_MIN_SCORE]
+
+    # Due criteri indipendenti, entrambi necessari (2026-08-05).
+    #
+    # Il solo punteggio di cornice non basta: i volantini CJ costruiti SU
+    # FONDO BIANCO lo superano tranquillamente. Verificato su un prodotto
+    # reale (lampadina-telecamera, 8 immagini tutte promozionali): 6 su 8
+    # passavano il filtro pur essendo pieni di scritte, banner e riquadri.
+    # Il secondo criterio guarda il testo sovrimpresso, che e' cio' che
+    # distingue davvero un volantino da una foto prodotto.
+    scored = []
+    for item in local_images:
+        bordo = _clean_shot_score(item[0])
+        testo = _text_row_ratio(item[0])
+        pulito = bordo >= CLEAN_SHOT_MIN_SCORE and testo <= MAX_TEXT_ROW_RATIO
+        scored.append((item, bordo, testo, pulito))
+
+    puliti = [it for it, b, t, ok in sorted(scored, key=lambda x: -x[1]) if ok]
     scartati = len(local_images) - len(puliti)
     if puliti:
         if scartati:
             print(f"  [render] scarto {scartati} immagini non pulite (collage/volantini), ne restano {len(puliti)}", flush=True)
         return puliti
-    print(f"  [render] nessuno scatto pulito trovato: uso le {min(3, len(scored))} meno peggio", flush=True)
-    return [item for item, _ in sorted(scored, key=lambda x: -x[1])][:3]
+
+    # Nessuno scatto pulito: si ordina per QUANTITA' DI TESTO crescente, non
+    # per punteggio di cornice. Su un catalogo tutto promozionale le immagini
+    # con meno scritte sono quelle in cui il prodotto occupa davvero la
+    # scena, mentre un'immagine con bella cornice bianca puo' essere una
+    # scheda tecnica illeggibile in un video.
+    print(f"  [render] nessuno scatto pulito trovato: uso le {min(3, len(scored))} con meno testo", flush=True)
+    return [it for it, b, t, ok in sorted(scored, key=lambda x: x[2])][:3]
 
 
 def _cutout_product(image_path: str, tmp_dir: str) -> str:
