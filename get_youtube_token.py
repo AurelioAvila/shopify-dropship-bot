@@ -4,7 +4,10 @@ YouTube per Groomlyco, Magdock o Beffante (canali/account Google separati).
 
 Prerequisiti:
 1. https://console.cloud.google.com/ - crea/riusa un progetto, abilita
-   "YouTube Data API v3"
+   "YouTube Data API v3" E "YouTube Analytics API" (2026-08-04: la seconda
+   serve per lo scope yt-analytics.readonly sotto - va abilitata a parte,
+   altrimenti le chiamate falliscono con "API not enabled" anche col token
+   giusto).
 2. Crea credenziali OAuth 2.0 di tipo "App desktop"
 3. Scarica il JSON e salvalo in questa cartella come
    client_secret_<brand>.json (es. client_secret_beffante.json)
@@ -34,6 +37,12 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 SCOPES = [
     "https://www.googleapis.com/auth/youtube.upload",
     "https://www.googleapis.com/auth/youtube.readonly",  # per leggere le statistiche nel dashboard
+    # Aggiunto 2026-08-04: Groomlyco/Magdock avevano un token con SOLO
+    # scope upload (niente readonly, niente analytics) - rilanciando con
+    # questa lista si chiudono entrambi i gap in un colpo solo. Retention/
+    # watch-time per video, non solo il conteggio finale delle views - vedi
+    # project_growth_algorithm_research_2026_08_04 in memoria.
+    "https://www.googleapis.com/auth/yt-analytics.readonly",
 ]
 
 parser = argparse.ArgumentParser()
