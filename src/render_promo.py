@@ -25,7 +25,7 @@ if not hasattr(PIL.Image, "ANTIALIAS"):
 import subprocess
 
 import requests
-from PIL import ImageEnhance, ImageFilter
+from PIL import ImageDraw, ImageEnhance, ImageFilter
 from moviepy.editor import (
     AudioFileClip,
     ColorClip,
@@ -189,6 +189,10 @@ TARGET_W, TARGET_H = 1080, 1920
 # lo standard. Nel feed un video piu' basso degli altri suona "debole" e
 # invita allo scroll - nessuno alza il volume, si passa al video dopo.
 LOUDNORM_FILTER = "loudnorm=I=-14:TP=-1.5:LRA=11"
+# Stessi valori di certsprint-reels-bot, solofounded-bot e del reel-generator
+# di PC Tweaker, cosi' i quattro generatori producono video equivalenti.
+VIDEO_BITRATE = "12000k"
+AUDIO_BITRATE = "192k"
 
 
 def _normalize_loudness(path: str) -> None:
@@ -226,7 +230,15 @@ def _normalize_loudness(path: str) -> None:
             os.remove(tmp_path)
 
 
-CAPTION_CHUNK_SIZE = 2
+# 4 parole per blocco (era 2, cambiato 2026-08-04). Stessa correzione gia'
+# applicata a solofounded-bot, certsprint-reels-bot e pc-tweaker: i
+# frammenti da 2 parole non compongono mai una frase leggibile. Verificato
+# su un Reel Beffante REALE pubblicato oggi, estraendo i fotogrammi: si
+# leggeva "watchable Throw" / "room before" / "Look at" - spezzoni a meta'
+# frase che costringono lo spettatore a ricostruire il senso mentre lo
+# sfondo cambia sotto. Era anche l'unico dei quattro generatori rimasto
+# indietro su questa regola.
+CAPTION_CHUNK_SIZE = 4
 CAPTION_FONTSIZE = 80
 CAPTION_Y = int(TARGET_H * 0.62)
 CAPTION_BAND_Y = int(TARGET_H * 0.56)
@@ -318,6 +330,144 @@ def download_images(urls: list[str], tmp_dir: str, enforce_min_resolution: bool 
     return results
 
 
+def _clean_shot_score(image_path: str) -> float:
+    """Quanto un'immagine somiglia a uno SCATTO PULITO da studio invece che a
+    un collage pubblicitario. 1.0 = cornice completamente uniforme e chiara.
+
+    Il set immagini di CJ mescola le due cose: prima qualche foto pulita su
+    fondo bianco, poi volantini promozionali pieni di testo, icone e riquadri
+    colorati. Verificato sui fotogrammi di un Reel Beffante reale: tre segmenti
+    su quattro mostravano un collage con scritte tipo "YT100 MINI VIDEO
+    PROJECTOR", che nel video sembra un volantino e non un prodotto.
+
+    Si misura la CORNICE (12% esterno) e non l'immagine intera perche' il
+    prodotto sta al centro: uno scatto da studio ha i bordi vuoti e uniformi,
+    un collage li riempie fino al taglio.
+    """
+    try:
+        img = PIL.Image.open(image_path).convert("RGB")
+        img.thumbnail((160, 160))  # basta per una statistica, ed e' veloce
+        w, h = img.size
+        bw, bh = max(int(w * 0.12), 2), max(int(h * 0.12), 2)
+        px = img.load()
+
+        coords = []
+        for x in range(w):
+            for y in range(bh):
+                coords.append((x, y))
+                coords.append((x, h - 1 - y))
+        for y in range(bh, h - bh):
+            for x in range(bw):
+                coords.append((x, y))
+                coords.append((w - 1 - x, y))
+
+        chiari = 0
+        for x, y in coords:
+            r, g, b = px[x, y]
+            # chiaro E poco saturo: esclude i bordi colorati dei volantini
+            if r > 225 and g > 225 and b > 225 and (max(r, g, b) - min(r, g, b)) < 18:
+                chiari += 1
+        return chiari / float(len(coords))
+    except Exception:
+        return 0.0
+
+
+CLEAN_SHOT_MIN_SCORE = 0.55
+
+
+def select_clean_shots(local_images: list) -> list:
+    """Tiene solo gli scatti puliti, in ordine di pulizia decrescente.
+
+    local_images e' una lista di tuple (path, width, height) - il formato
+    restituito da download_images - non di semplici path. Un bug qui il
+    2026-08-04 passava la tupla intera a PIL.Image.open(), che falliva in
+    silenzio (catturato dal try/except di _clean_shot_score) dando 0.0 a
+    OGNI immagine: la guardia "nessuno scatto pulito" scattava sempre,
+    anche su cataloghi con foto perfettamente pulite - verificato dopo un
+    render reale, dove 3 prodotti su 3 avevano punteggi 0.7-0.9 ma il log
+    diceva comunque "nessuno trovato".
+
+    Non svuota mai la lista: se nessuna immagine supera davvero la soglia
+    (prodotto fotografato solo in ambiente, catalogo tutto a collage)
+    restituisce le migliori disponibili, perche' un video con foto
+    imperfette e' comunque meglio di nessun video.
+    """
+    if not local_images:
+        return local_images
+    scored = [(item, _clean_shot_score(item[0])) for item in local_images]
+    puliti = [item for item, s in sorted(scored, key=lambda x: -x[1]) if s >= CLEAN_SHOT_MIN_SCORE]
+    scartati = len(local_images) - len(puliti)
+    if puliti:
+        if scartati:
+            print(f"  [render] scarto {scartati} immagini non pulite (collage/volantini), ne restano {len(puliti)}", flush=True)
+        return puliti
+    print(f"  [render] nessuno scatto pulito trovato: uso le {min(3, len(scored))} meno peggio", flush=True)
+    return [item for item, _ in sorted(scored, key=lambda x: -x[1])][:3]
+
+
+def _cutout_product(image_path: str, tmp_dir: str) -> str:
+    """Toglie lo sfondo bianco da studio dalla foto prodotto, restituendo un
+    PNG con trasparenza (o il path originale se non e' il caso di toccarla).
+
+    Perche' serve (2026-08-04): con uno sfondo b-roll dietro, la foto CJ
+    veniva incollata sopra come RETTANGOLO BIANCO - verificato estraendo i
+    fotogrammi di un Reel Beffante reale gia' pubblicato: il proiettore
+    appariva dentro un riquadro bianco sospeso sul video, l'effetto
+    "adesivo" che l'utente ha descritto come immagine sbiadita. Ritagliando
+    il prodotto, resta solo l'oggetto sopra il b-roll, come fanno i creator
+    veri di product-ad.
+
+    Il riempimento parte dai BORDI, non da una soglia globale sul colore:
+    molti prodotti sono essi stessi bianchi (il proiettore Beffante lo e'),
+    e una soglia globale li cancellerebbe insieme allo sfondo. Cosi' invece
+    sparisce solo il bianco CONNESSO al bordo, cioe' lo sfondo vero.
+    """
+    try:
+        img = PIL.Image.open(image_path).convert("RGB")
+        w, h = img.size
+        # Maschera di lavoro: 0 = da tenere. Il flood fill marca a 255 il
+        # bianco raggiungibile dai bordi.
+        mask = PIL.Image.new("L", (w, h), 0)
+        # Si lavora su una copia RGB dove il flood fill "colora" il bianco.
+        probe = img.copy()
+        seeds = [(0, 0), (w - 1, 0), (0, h - 1), (w - 1, h - 1),
+                 (w // 2, 0), (w // 2, h - 1), (0, h // 2), (w - 1, h // 2)]
+        MARKER = (255, 0, 255)  # magenta, non presente in una foto da studio
+        for seed in seeds:
+            if sum(probe.getpixel(seed)) >= 720:  # ~240 medio per canale
+                ImageDraw.floodfill(probe, seed, MARKER, thresh=38)
+
+        px_probe, px_mask = probe.load(), mask.load()
+        removed = 0
+        for y in range(h):
+            for x in range(w):
+                if px_probe[x, y] == MARKER:
+                    px_mask[x, y] = 255
+                    removed += 1
+
+        frac = removed / float(w * h)
+        # Guardie: se non si e' tolto quasi nulla non vale la pena, e se si
+        # e' mangiato quasi tutto qualcosa e' andato storto (foto senza
+        # sfondo bianco, prodotto chiarissimo che tocca i bordi) - in
+        # entrambi i casi si tiene l'originale invece di rovinare il video.
+        if frac < 0.05 or frac > 0.90:
+            return image_path
+
+        alpha = PIL.Image.eval(mask, lambda v: 255 - v)
+        # Ammorbidisce di un pelo il bordo: senza, il ritaglio ha una
+        # scalettatura dura che si nota sopra un video in movimento.
+        alpha = alpha.filter(ImageFilter.GaussianBlur(0.8))
+        out = img.convert("RGBA")
+        out.putalpha(alpha)
+
+        cut_path = os.path.join(tmp_dir, "_product_cutout.png")
+        out.save(cut_path)
+        return cut_path
+    except Exception as e:
+        print(f"  [render] ritaglio sfondo saltato ({e}) - uso la foto originale", flush=True)
+        return image_path
+
+
 def _make_blurred_background(image_path: str, tmp_dir: str) -> str:
     """Cover-crops + heavily blurs the product photo to fill the frame as a
     backdrop. Confirmed live (2026-07-30) that real CJ product photos come
@@ -406,7 +556,12 @@ def _ken_burns_clip(image_path: str, img_w: int, img_h: int, duration: float, tm
     # true native size (letterboxed, backed by the blurred full-bleed
     # layer) instead of being stretched into visible mush.
     fit_scale = min(TARGET_W / img_w, TARGET_H / img_h, 1.0)
-    product = ImageClip(image_path).resize(fit_scale)
+    # Ritaglio dallo sfondo bianco SOLO quando c'e' un b-roll dietro: senza
+    # b-roll lo sfondo e' la stessa foto sfocata, dove il rettangolo bianco
+    # non si nota e togliere lo sfondo lascerebbe il prodotto a fluttuare
+    # su una versione sfocata di se stesso.
+    product_path = _cutout_product(image_path, tmp_dir) if bg_video_path else image_path
+    product = ImageClip(product_path, transparent=True).resize(fit_scale)
 
     # Ken Burns zoom on top of fit_scale, capped so the TOTAL scale (fit *
     # zoom) never crosses SAFE_UPSCALE_FACTOR past native resolution -
@@ -535,6 +690,10 @@ def build_promo_video(script_text: str, image_urls: list[str], output_path: str,
     duration = audio.duration
 
     local_images = download_images(image_urls, tmp_dir, enforce_min_resolution=(niche is None))
+    # Scarta i collage promozionali di CJ e tiene solo gli scatti puliti:
+    # sono gli unici che, ritagliati dallo sfondo bianco, stanno bene sopra
+    # il b-roll (vedi select_clean_shots e _cutout_product).
+    local_images = select_clean_shots(local_images)
     # Numero di segmenti = quanti tagli servono per stare sotto MAX_SEGMENT_SECONDS,
     # ma mai piu' immagini distinte di quelle disponibili moltiplicate per 2
     # (oltre le quali ricicleremmo troppo la stessa foto, diventa ripetitivo).
@@ -606,7 +765,12 @@ def build_promo_video(script_text: str, image_urls: list[str], output_path: str,
     # comprime pesantemente i bordi netti del testo (causa reale dello sfocato).
     final.write_videofile(
         output_path, fps=30, codec="libx264", audio_codec="aac",
-        bitrate="8000k", preset="medium", logger=None,
+        # Allineati agli altri tre generatori il 2026-08-04 (erano 8000k
+        # video e audio lasciato al default di moviepy): l'utente ha chiesto
+        # che nessun account abbia qualita' inferiore a un altro, e questo
+        # era l'ultimo parametro fuori standard nell'ecosistema.
+        bitrate=VIDEO_BITRATE, audio_bitrate=AUDIO_BITRATE,
+        preset="medium", logger=None,
         # moov atom in testa al file invece che in fondo - senza questo il
         # player deve scaricare l'intero file prima di poter leggere i
         # metadati, causando il classico "primo tap non parte, secondo si"

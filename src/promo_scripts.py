@@ -504,6 +504,24 @@ SUBCATEGORY_PAYOFFS = {
 }
 
 
+# Quota di video che NON vendono nulla. 0.8 = 4 su 5 puro contenuto utile,
+# 1 su 5 con spinta al negozio. Alzare/abbassare qui e' il modo di ritarare
+# la strategia senza toccare altro; a 0 si torna al comportamento precedente.
+VALUE_FIRST_PROBABILITY = 0.8
+
+# Chiusure orientate a salvataggio e condivisione, mai al negozio: sono i due
+# segnali che l'algoritmo pesa di piu' (una DM share vale 3-10x un like, un
+# save ~5x) ed erano quelli che i nostri video non chiedevano mai davvero,
+# perche' finivano tutti con "shop the link".
+VALUE_CLOSERS = [
+    "Save this so you have it when you need it.",
+    "Send this to someone who keeps getting it wrong.",
+    "Save this before your next one.",
+    "Share this with whoever's about to buy the wrong thing.",
+    "Worth saving if you've ever wondered why.",
+]
+
+
 def build_script_for_product(title: str, niche: str = None) -> tuple:
     """Returns (script_text, niche, hook) - niche is 'PET', 'TECH' or 'HOME',
     used to pick the Shopify brand (Groomlyco/Magdock/Beffante) downstream.
@@ -533,13 +551,36 @@ def build_script_for_product(title: str, niche: str = None) -> tuple:
     # tornare None su un prodotto fuori dalle keyword note) si ricade sulla
     # vecchia resolution invece di lasciare un buco nello script.
     payoff_pool = SUBCATEGORY_PAYOFFS.get(subcategory) or resolutions
-    payoff = random.choice(payoff_pool)
-    closer = random.choice(closers)
-    script = f"{hook} {payoff} {closer}"
-    return script, niche, hook
+
+    # VALUE-FIRST (2026-08-04): 4 video su 5 non vendono nulla.
+    #
+    # Motivo, misurato: watch time mediano 2.2-3.7s e ZERO share su 60+ post
+    # di TUTTI gli account. Nel 2026 il segnale di ranking piu' pesante e' la
+    # condivisione in DM, e nessuno manda a un amico una pubblicita'. Un
+    # catalogo di video che finiscono tutti con "compra qui" non puo'
+    # generare share per costruzione, a prescindere da quanto sia curato il
+    # render - infatti la qualita' tecnica e' allineata su tutti e quattro i
+    # generatori senza che le views si muovano.
+    #
+    # Cambia SOLO la chiusura: niente negozio, ma una CTA di salvataggio o
+    # condivisione. Il prodotto resta visibile a schermo, quindi il brand
+    # lavora comunque, ma il video ha un motivo di esistere anche per chi non
+    # comprera' mai.
+    #
+    # Un primo tentativo usava ENTRAMBI i payoff per rendere il video piu'
+    # ricco: misurato, portava lo script da 37 a 59 parole medie, cioe' da
+    # ~11s a ~18s - una regressione diretta sul lavoro fatto per stare sotto
+    # i 15s (la ricerca 2026 misura fino a 1.8x replay sotto quella soglia, e
+    # i replay contano nel watch time). La sostanza della strategia e' NON
+    # VENDERE, non allungare: un payoff solo, chiusura diversa.
+    value_first = random.random() < VALUE_FIRST_PROBABILITY
+
+    closer = random.choice(VALUE_CLOSERS) if value_first else random.choice(closers)
+    script = f"{hook} {random.choice(payoff_pool)} {closer}"
+    return script, niche, hook, value_first
 
 
-def build_caption_for_product(title: str, niche: str, hook: str) -> str:
+def build_caption_for_product(title: str, niche: str, hook: str, value_first: bool = False) -> str:
     # Prima la caption era solo il nome nudo del prodotto ("Flip Phone Case
     # Cover Card Wallet - Shop the link...") mentre il voiceover aveva gia'
     # un hook narrativo - i dati (cross_account_growth_analysis.py, 2026-08-02)
@@ -555,6 +596,12 @@ def build_caption_for_product(title: str, niche: str, hook: str) -> str:
         "HOME": ["#desksetup", "#homeoffice", "#techfinds", "#gadgets", "#workfromhome"],
     }[niche]
     tags = " ".join(random.sample(tag_pool, 3))
+    # value_first: la caption deve seguire il video. Se il voiceover non
+    # vende, mettere "Shop the link in our bio" sotto lo rimetterebbe nella
+    # casella "pubblicita'" agli occhi di chi legge e dell'algoritmo,
+    # annullando il motivo per cui il video e' stato scritto cosi'.
+    if value_first:
+        return f"{hook} {random.choice(VALUE_CLOSERS)} {tags}"
     # ~50% delle volte usa una CTA orientata a save/share invece del solo
     # link - varieta' e allineamento al segnale di ranking piu' pesante,
     # senza perdere del tutto la spinta diretta al negozio.

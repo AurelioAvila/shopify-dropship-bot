@@ -296,7 +296,10 @@ def run(count: int = 2, skip_tiktok: bool = False, skip_instagram: bool = False,
             # rotazione per brand: il turno di MAGDOCK poteva pubblicare su
             # GROOMLYCO.
             brand = target_brand
-            script, niche, hook = build_script_for_product(title, niche=NICHE_BY_BRAND[brand])
+            # value_first (2026-08-04): 4 video su 5 non spingono il negozio -
+            # vedi VALUE_FIRST_PROBABILITY in promo_scripts. Va passato alla
+            # caption perche' testo e voiceover devono dire la stessa cosa.
+            script, niche, hook, value_first = build_script_for_product(title, niche=NICHE_BY_BRAND[brand])
 
             video_id = f"auto-{int(time.time())}-{pid[-6:]}"
             output_path = os.path.join(OUTPUT_DIR, f"{video_id}.mp4")
@@ -317,7 +320,7 @@ def run(count: int = 2, skip_tiktok: bool = False, skip_instagram: bool = False,
                     _append_log({"cj_pid": pid, "title": title, "skipped": "low_resolution"})
                 continue
 
-            caption = build_caption_for_product(title, niche, hook)
+            caption = build_caption_for_product(title, niche, hook, value_first=value_first)
             entry = {"cj_pid": pid, "title": title, "brand": brand, "video_id": video_id, "script": script}
             if recycled:
                 entry["recycled"] = True
