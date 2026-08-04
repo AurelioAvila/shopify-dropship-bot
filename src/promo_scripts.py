@@ -422,7 +422,48 @@ YOUTUBE_TITLE_MAX = 100
 _SHORTS_SUFFIX = " #shorts"
 
 
-def build_youtube_title(hook: str) -> str:
+# Rumore tipico dei nomi prodotto CJdropshipping: sigle, compatibilita',
+# ripetizioni. Va tolto prima di mettere il prodotto in un titolo YouTube.
+_PRODUCT_NOISE = (
+    "compatible with apple", "compatible with", "for apple", "multi-function",
+    "multifunctional", "high quality", "new arrival", "hot sale", "dropship",
+    "free shipping", "wholesale", "2026", "2025",
+)
+_PRODUCT_MAX_WORDS = 6
+
+
+def shorten_product_name(name: str) -> str:
+    """Riduce il nome prodotto a qualcosa di leggibile in un titolo.
+
+    I nomi CJ sono lunghissimi e ripetitivi ("Compatible with Apple,
+    Compatible with Apple , Mobile Phone MagSafe Magnetic Push Cover
+    Protective Case" - caso reale dai log): messo intero saturerebbe il
+    titolo senza aggiungere nulla di cercabile.
+    """
+    if not name:
+        return ""
+    low = name.lower()
+    for noise in _PRODUCT_NOISE:
+        low = low.replace(noise, " ")
+
+    # Si tiene il primo segmento NON VUOTO, non semplicemente il primo.
+    # Con "Compatible with Apple, Compatible with Apple , Mobile Phone
+    # MagSafe..." la rimozione del rumore lascia il nome che inizia con una
+    # virgola: prendendo split(",")[0] il risultato era la stringa vuota e
+    # il prodotto spariva del tutto dal titolo (trovato testando proprio
+    # questo nome, preso dai log reali).
+    for sep in (",", " - ", "|", "/"):
+        if sep in low:
+            parts = [p for p in low.split(sep) if p.strip()]
+            if parts:
+                low = parts[0]
+
+    words = [w for w in low.split() if any(c.isalnum() for c in w)]
+    words = words[:_PRODUCT_MAX_WORDS]
+    return " ".join(w.capitalize() for w in words).strip()
+
+
+def build_youtube_title(hook: str, product_name: str = "") -> str:
     """Titolo YouTube a partire dall'hook, con "#shorts" SEMPRE presente.
 
     Bug reale (2026-08-02, video _JQ5J6ktUDs): il titolo era costruito dalla
@@ -438,9 +479,32 @@ def build_youtube_title(hook: str) -> str:
         vanno;
       - il troncamento avviene su confine di parola e riserva lo spazio per
         il suffisso, che quindi non puo' piu' essere tagliato.
+
+    Aggiunta 2026-08-04: quando il nome prodotto e' disponibile finisce nel
+    titolo. Col solo hook uscivano titoli come "Look at the difference.
+    #shorts" o "Try it once and you'll see. #shorts" - frasi senza un solo
+    sostantivo cercabile. Su Instagram/TikTok va bene (la caption e'
+    secondaria al video), ma su YouTube il titolo E' la superficie di
+    ricerca, e i dati misurati sugli altri canali dicono che i titoli senza
+    soggetto concreto restano a 0 views.
     """
-    hook = (hook or "").strip()
+    hook = (hook or "").strip().rstrip(" .")
+    product = shorten_product_name(product_name)
+
     budget = YOUTUBE_TITLE_MAX - len(_SHORTS_SUFFIX)
+    if product:
+        candidate = f"{hook} | {product}"
+        if len(candidate) <= budget:
+            hook = candidate
+        else:
+            # Se non ci sta tutto, ha precedenza il PRODOTTO (e' la parte
+            # cercabile): si accorcia l'hook, non lo si butta.
+            room = budget - len(product) - 3
+            if room > 15:
+                hook = f"{hook[:room].rsplit(' ', 1)[0].rstrip(' ,.;:-')} | {product}"
+            else:
+                hook = product
+
     if len(hook) > budget:
         hook = hook[:budget].rsplit(" ", 1)[0].rstrip(" ,.;:-")
     return f"{hook}{_SHORTS_SUFFIX}"

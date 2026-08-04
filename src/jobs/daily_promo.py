@@ -263,7 +263,10 @@ def run(count: int = 2, skip_tiktok: bool = False, skip_instagram: bool = False,
             # Instagram inclusi), arrivava a 130-187 caratteri, YouTube
             # troncava a 100 e "#shorts" spariva - verificato sul video
             # pubblicato _JQ5J6ktUDs. Vedi build_youtube_title.
-            yt_title = build_youtube_title(hook)
+            # Il nome prodotto entra nel titolo: senza, uscivano titoli come
+            # "Try it once and you'll see. #shorts", cioe' senza una sola
+            # parola cercabile su YouTube. Vedi build_youtube_title.
+            yt_title = build_youtube_title(hook, product_name=title)
             description = f"{script}\n\n{caption}"
             # I progetti OAuth non ancora verificati da Google hanno una quota
             # giornaliera di upload video molto bassa (uploadLimitExceeded) -
