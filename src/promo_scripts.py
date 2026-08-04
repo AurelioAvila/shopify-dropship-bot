@@ -104,8 +104,20 @@ TECH_RESOLUTIONS = [
 # un prodotto che non c'entra si sente ingannato e scrolla a meta' video:
 # retention distrutta proprio dove l'algoritmo la misura (checkpoint 3/10/20s).
 SUBCATEGORY_KEYWORDS = {
+    # "paw"/"paw cleaner"/"paw wash" aggiunti dall'altra sessione il
+    # 2026-08-05: prodotti descritti solo come "paw cleaner" senza le altre
+    # parole di grooming restavano senza sottocategoria.
     "PET_GROOMING": ("brush", "comb", "nail", "clipper", "shampoo", "bath", "deshedding", "hair remover", "grooming", "trimmer", "paw", "paw cleaner", "paw wash"),
-    "PET_FEEDING": ("feeder", "bowl", "food", "treat", "puzzle", "slow", "water", "bottle", "dispenser", "leakage"),
+    # PET_FEEDING copriva sia le ciotole sia le borracce/dispenser d'acqua
+    # (2026-08-04): due problemi diversi con risposte diverse, quindi la
+    # scelta casuale dell'hook poteva mettere "Carrying an open cup of water
+    # for him never once worked" su una ciotola slow-feeder, e - dopo
+    # l'introduzione dei payoff - accoppiare un hook sull'acqua con una
+    # spiegazione sul mangiare troppo in fretta. Separate: PET_FEEDING resta
+    # sul cibo, PET_HYDRATION prende acqua/borracce/dispenser. Non
+    # riunificarle: e' esattamente il difetto che questo split ha corretto.
+    "PET_FEEDING": ("feeder", "bowl", "food", "treat", "puzzle", "slow", "leakage"),
+    "PET_HYDRATION": ("water", "bottle", "dispenser", "drink", "hydration"),
     "PET_COMFORT": ("bed", "mat", "pad", "cooling", "pillow", "blanket", "sleeping", "cushion"),
     "PET_WALKING": ("leash", "collar", "harness", "poop", "walking"),
     "PET_TOYS": ("toy", "ball", "chew", "interactive", "rope"),
@@ -189,6 +201,10 @@ SUBCATEGORY_HOOKS = {
         "My vet asked one question about mealtimes and it explained everything.",
         "Your dog isn't greedy, the bowl is just the wrong shape.",
         "The bloating scare cost me a night at the emergency vet.",
+    ],
+    # Spostati qui da PET_FEEDING il 2026-08-04: parlano di acqua, non di
+    # cibo, e restando nello stesso pool finivano su prodotti-ciotola.
+    "PET_HYDRATION": [
         "He used to drink from puddles on every walk because I forgot water.",
         "A thirsty dog on a hot walk is how a good afternoon turns into a vet visit.",
         "Carrying an open cup of water for him never once worked.",
@@ -319,6 +335,23 @@ def _detect_subcategory(title: str, niche: str) -> str:
 
 
 def _detect_niche(title: str) -> str:
+    """Nicchia indovinata dal SOLO titolo. E' un ripiego: quando il vendor
+    Shopify e' noto va passato a build_script_for_product(niche=...), perche'
+    e' un dato curato e questa funzione no.
+
+    Misurato 2026-08-04 su tutto il catalogo: 13 prodotti su 139 (9%)
+    finivano nella nicchia sbagliata, e 8 erano accessori da auto mandati in
+    PET - cioe' pubblicati sul canale Groomlyco con un voiceover sui cani
+    sopra le foto di un tracker GPS o di una dash cam. La causa era il
+    ripiego finale, che era un lancio di moneta:
+        return "PET" if random.random() < 0.5 else "TECH"
+    Un prodotto senza keyword note veniva assegnato a caso, quindi anche il
+    brand su cui veniva pubblicato era casuale. Ora il ripiego e' TECH, che
+    e' la nicchia piu' generica delle tre (un oggetto non riconosciuto e'
+    quasi sempre un accessorio, non un articolo per animali), ed e'
+    deterministico: lo stesso prodotto da' sempre lo stesso risultato, quindi
+    un errore e' riproducibile e correggibile invece di apparire a caso.
+    """
     t = title.lower()
     if any(k in t for k in PET_KEYWORDS):
         return "PET"
@@ -327,9 +360,7 @@ def _detect_niche(title: str) -> str:
     # prodotti Beffante finirebbero pubblicati sull'account Magdock.
     if any(k in t for k in HOME_KEYWORDS):
         return "HOME"
-    if any(k in t for k in TECH_KEYWORDS):
-        return "TECH"
-    return "PET" if random.random() < 0.5 else "TECH"
+    return "TECH"
 
 
 # Chiusura del voiceover. Prima era la stringa fissa "Look at the result."
@@ -388,12 +419,103 @@ HOME_RESOLUTIONS = [
 ]
 
 
-def build_script_for_product(title: str) -> tuple:
-    """Returns (script_text, niche, hook) - niche is 'PET' or 'TECH', used to
-    pick the Shopify brand (Groomlyco vs Magdock) downstream. The hook is
-    returned separately so the caption can open with it too - see
-    build_caption_for_product."""
-    niche = _detect_niche(title)
+# PAYOFF: la risposta vera alla promessa fatta dall'hook (aggiunto 2026-08-04).
+#
+# Perche' esiste. Fino a oggi lo script era hook + resolution + closer, dove
+# la resolution e' una frase vuota ("Here's what actually works.", "This
+# changes everything."). Risultato: l'hook prometteva una spiegazione
+# specifica ("There's a reason your dog abandons the bed and lies on the
+# tiles") e il video non la dava MAI. Chi guarda resta in attesa del
+# pagamento della promessa, non arriva, e se ne va: e' coerente col dato
+# misurato il 2026-08-04, cioe' ZERO share e ZERO save su 64+ post di tutti
+# i brand, con retention ferma al 28-39%. Un video senza informazione non e'
+# condivisibile - non c'e' niente da mandare a un amico.
+#
+# Regole seguite scrivendoli:
+#  - nessuna statistica inventata (regola permanente): sono spiegazioni di
+#    meccanismo verificabili, non numeri;
+#  - frasi corte (12-18 parole) per non gonfiare la durata: il payoff
+#    sostituisce la resolution, non si aggiunge, cosi' il video passa da
+#    ~9s a ~13s invece di raddoppiare;
+#  - il payoff deve rispondere alla stessa domanda che pone l'hook della
+#    sottocategoria, altrimenti si ricrea il mismatch hook/prodotto gia'
+#    corretto una volta per SUBCATEGORY_HOOKS.
+SUBCATEGORY_PAYOFFS = {
+    "PET_GROOMING": [
+        "Most dogs don't hate the brush, they hate being held still, so work in short passes and let him stand.",
+        "Loose hair comes out easier before a bath, not after, because wet fur mats around the undercoat.",
+    ],
+    "PET_FEEDING": [
+        "Eating fast means swallowing air, and that's what causes the bloating, so the fix is slowing the bowl down, not feeding less.",
+        "A bowl that makes him work for it turns a ten second meal into a few minutes, which is the whole point.",
+    ],
+    "PET_HYDRATION": [
+        "Dogs drink far less on walks than they need, and they'll take water from a bowl shape long before a narrow spout.",
+        "Refusing water on a walk is usually about how it's offered, not thirst, which is why a fold-out bowl works when a bottle doesn't.",
+    ],
+    "PET_COMFORT": [
+        "Dogs lose heat through their paws and belly, not by sweating, so a cool surface does more than a fan ever will.",
+        "That's why he picks the tiles: he's looking for something that pulls heat away, and a padded bed traps it instead.",
+    ],
+    "PET_WALKING": [
+        "Pulling is leverage, not disobedience, so moving the clip to the chest takes the leverage away without correcting him.",
+        "A harness that sits on the shoulders lets him pull with his whole body, which is why your arm gives out first.",
+    ],
+    "PET_TOYS": [
+        "Destructive chewing is almost always boredom, so the fix is a toy that takes work to solve, not a tougher toy.",
+        "A toy that gives up its treat too easily gets abandoned in minutes, which is why difficulty matters more than durability.",
+    ],
+    "TECH_CHARGING": [
+        "Wireless charging loses most of its speed to misalignment, so a magnet that centres the coil matters more than the wattage.",
+        "Heat is what kills a battery, and a pad that keeps the phone raised charges cooler than one lying flat against it.",
+    ],
+    "TECH_CAR": [
+        "Vent mounts fail because the vent itself flexes, so the ones that hold clamp onto something rigid instead.",
+        "Every brake and pothole is a small drop test, which is why grip strength matters more than how the mount looks.",
+    ],
+    "TECH_CASE": [
+        "A wallet case isn't about protection, it's about not carrying a second thing, which is the part reviews never mention.",
+        "Corners take the impact in almost every drop, so raised corners do more than a thicker back ever will.",
+    ],
+    "TECH_DESK": [
+        "Cable mess isn't a tidiness problem, it's a length problem, so shortening the run fixes what clips never will.",
+        "A stand that lifts the screen to eye level does more for your neck than any chair adjustment.",
+    ],
+    "HOME_STREAMING": [
+        "Bad video is almost always bad light, not a bad camera, so lighting your face beats upgrading the lens.",
+        "Front light removes the shadows that make a webcam look cheap, which is why the ring matters more than megapixels.",
+    ],
+    "HOME_SECURITY": [
+        "Most home cameras miss what matters because of placement, not resolution, so height and angle beat specs.",
+        "Recording locally means it still works when the internet drops, which is exactly when you'd want it most.",
+    ],
+    "HOME_ENTERTAINMENT": [
+        "Projector brightness matters far less than controlling the light in the room, which is why daytime viewing disappoints.",
+        "Throw distance decides your screen size, so measure the room before you pick the projector, not after.",
+    ],
+    "HOME_WEARABLE": [
+        "Sleep tracking is the feature people actually keep using, and it only works if the strap is comfortable enough to wear at night.",
+        "Battery life decides whether you keep wearing it, because a watch charging on the desk tracks nothing.",
+    ],
+    "HOME_WORKSPACE": [
+        "Power banks are rated by cell capacity, not by what reaches your device, so expect noticeably less than the number on the box.",
+        "Charging a laptop needs enough wattage, not just enough capacity, which is the spec that gets buried.",
+    ],
+}
+
+
+def build_script_for_product(title: str, niche: str = None) -> tuple:
+    """Returns (script_text, niche, hook) - niche is 'PET', 'TECH' or 'HOME',
+    used to pick the Shopify brand (Groomlyco/Magdock/Beffante) downstream.
+    The hook is returned separately so the caption can open with it too - see
+    build_caption_for_product.
+
+    `niche` esplicita (2026-08-04): il chiamante che conosce gia' il vendor
+    Shopify del prodotto deve passarlo, invece di far reindovinare la nicchia
+    dal titolo. Il vendor e' curato a mano, il titolo CJ no - vedi
+    _detect_niche per i numeri sull'errore che questo evita.
+    """
+    niche = niche if niche in ("PET", "TECH", "HOME") else _detect_niche(title)
     # Hook coerente col prodotto quando riconosciamo la sottocategoria,
     # altrimenti si ricade sul pool generico della nicchia.
     subcategory = _detect_subcategory(title, niche)
@@ -405,9 +527,15 @@ def build_script_for_product(title: str) -> tuple:
     default_hooks, resolutions, closers = _pools[niche]
     hook_pool = SUBCATEGORY_HOOKS.get(subcategory) or default_hooks
     hook = random.choice(hook_pool)
-    resolution = random.choice(resolutions)
+    # Il payoff SOSTITUISCE la resolution generica, non si aggiunge: e' la
+    # risposta vera alla promessa dell'hook (vedi SUBCATEGORY_PAYOFFS).
+    # Quando la sottocategoria non e' riconosciuta (_detect_subcategory puo'
+    # tornare None su un prodotto fuori dalle keyword note) si ricade sulla
+    # vecchia resolution invece di lasciare un buco nello script.
+    payoff_pool = SUBCATEGORY_PAYOFFS.get(subcategory) or resolutions
+    payoff = random.choice(payoff_pool)
     closer = random.choice(closers)
-    script = f"{hook} {resolution} {closer}"
+    script = f"{hook} {payoff} {closer}"
     return script, niche, hook
 
 
@@ -449,9 +577,34 @@ _PRODUCT_NOISE = (
     "free shipping", "wholesale", "2026", "2025",
 )
 _PRODUCT_MAX_WORDS = 6
+# Sotto le 2 parole il nome prodotto non identifica piu' niente ("Pet",
+# "Usb"): meglio nessun prodotto che un moncherino.
+_PRODUCT_MIN_WORDS = 2
+
+# Token di specifica che i nomi CJ mettono DAVANTI al tipo di prodotto
+# ("1.5l Cat Dog Water Bowl", "4 In 1 Retractable Car Charger", "36 Inch
+# Professional Pet Dog Grooming"). Tenendo le prime N parole si finiva per
+# tenere solo la specifica e buttare il sostantivo cercabile - cioe' l'unica
+# ragione per cui il prodotto sta nel titolo.
+_SPEC_UNITS = (
+    "in", "inch", "inches", "cm", "mm", "m", "ft", "l", "ml", "pcs", "pack",
+    "set", "layers", "layer", "degrees", "degree", "w", "a", "v", "k", "p",
+    "hz", "mah", "g", "kg", "oz", "x",
+)
 
 
-def shorten_product_name(name: str) -> str:
+def _is_spec_token(word: str) -> bool:
+    """True se la parola e' una specifica ("2pcs", "120w", "1080p", "4", "in",
+    "layers") e non il nome di cio' che il prodotto e'.
+
+    Regola volutamente semplice: contiene una cifra, oppure e' un'unita' di
+    misura. "Type-c" non ha cifre e non e' un'unita', quindi resta.
+    """
+    w = word.strip().lower()
+    return (not w) or w in _SPEC_UNITS or any(c.isdigit() for c in w)
+
+
+def shorten_product_name(name: str, max_words: int = _PRODUCT_MAX_WORDS) -> str:
     """Riduce il nome prodotto a qualcosa di leggibile in un titolo.
 
     I nomi CJ sono lunghissimi e ripetitivi ("Compatible with Apple,
@@ -478,7 +631,17 @@ def shorten_product_name(name: str) -> str:
                 low = parts[0]
 
     words = [w for w in low.split() if any(c.isalnum() for c in w)]
-    words = words[:_PRODUCT_MAX_WORDS]
+
+    # Via le specifiche IN TESTA (non quelle in mezzo: "Usb Type-c Cable 120w"
+    # deve restare tale se ci sta). Se il nome fosse fatto di sole specifiche
+    # si tiene tutto, meglio qualcosa che niente.
+    head = 0
+    while head < len(words) and _is_spec_token(words[head]):
+        head += 1
+    if head < len(words):
+        words = words[head:]
+
+    words = words[:max_words]
     return " ".join(w.capitalize() for w in words).strip()
 
 
@@ -508,22 +671,43 @@ def build_youtube_title(hook: str, product_name: str = "") -> str:
     soggetto concreto restano a 0 views.
     """
     hook = (hook or "").strip().rstrip(" .")
-    product = shorten_product_name(product_name)
-
     budget = YOUTUBE_TITLE_MAX - len(_SHORTS_SUFFIX)
-    if product:
+
+    # Correzione 2026-08-04 (secondo giro). La versione precedente dava
+    # precedenza al prodotto e accorciava l'hook: misurato sull'INTERO
+    # catalogo, 111 titoli su 132 (84%) uscivano con l'hook tagliato a meta'
+    # frase, cioe' senza la parola che lo rende una frase. Reali, dai video
+    # gia' pubblicati:
+    #   "Nobody tells you this before you get | Motorcycle Electric Vehicle"
+    #   "I've bought the same charger three times because I | Magnetic Cable"
+    #   "I didn't expect a projector this size to actually be | Mini Led"
+    # Il taglio cade su confine di parola, quindi il codice sembrava corretto,
+    # ma un hook monco non e' un hook: e' la stessa cosa che si e' gia' pagata
+    # a frame 0 col fragment "This is" al posto della frase intera.
+    #
+    # Ora la priorita' e' invertita e la regola e' netta: l'hook non si tocca,
+    # il prodotto si accorcia finche' ci sta (e sparisce se proprio non ci
+    # sta). L'hook e' cio' che fa fermare lo scroll; il prodotto e' un bonus
+    # di ricercabilita', non vale il prezzo di rompere la frase.
+    if len(hook) > budget:
+        # Unico caso in cui l'hook viene tagliato: da solo non ci sta.
+        # Si taglia sull'ultimo confine di proposizione disponibile, non
+        # sull'ultima parola: "If your dog destroys everything when you leave
+        # the house" si regge da solo, "...it's not bad behavior, it's" no.
+        cut = hook[:budget]
+        clause = max(cut.rfind(","), cut.rfind(";"), cut.rfind(" - "))
+        if clause > budget // 2:
+            cut = cut[:clause]
+        else:
+            cut = cut.rsplit(" ", 1)[0]
+        return f"{cut.rstrip(' ,.;:-')}{_SHORTS_SUFFIX}"
+
+    for words in range(_PRODUCT_MAX_WORDS, _PRODUCT_MIN_WORDS - 1, -1):
+        product = shorten_product_name(product_name, words)
+        if not product:
+            break
         candidate = f"{hook} | {product}"
         if len(candidate) <= budget:
-            hook = candidate
-        else:
-            # Se non ci sta tutto, ha precedenza il PRODOTTO (e' la parte
-            # cercabile): si accorcia l'hook, non lo si butta.
-            room = budget - len(product) - 3
-            if room > 15:
-                hook = f"{hook[:room].rsplit(' ', 1)[0].rstrip(' ,.;:-')} | {product}"
-            else:
-                hook = product
+            return f"{candidate}{_SHORTS_SUFFIX}"
 
-    if len(hook) > budget:
-        hook = hook[:budget].rsplit(" ", 1)[0].rstrip(" ,.;:-")
     return f"{hook}{_SHORTS_SUFFIX}"
