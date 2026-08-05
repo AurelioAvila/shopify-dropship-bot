@@ -36,16 +36,28 @@ def upload_video(brand: str, video_path: str, title: str, description: str, tags
                  thumbnail_path: str = None) -> str:
     youtube = _get_authenticated_service(brand)
 
+    # Trasparenza AI (2026-08-05): EU AI Act art. 50, applicabile dal 2
+    # agosto 2026 - i contenuti generati da AI vanno resi identificabili con
+    # marcatura machine-readable. Questi promo sono interamente generati
+    # (script assemblato + voce TTS su foto prodotto): il flag e' il campo
+    # che l'API YouTube espone apposta, "#ai" e' la parte visibile.
+    tags = list(tags or [])
+    if not any(t.lower() == "ai" for t in tags):
+        tags.append("ai")
+    if "#ai" not in description.lower():
+        description = description.rstrip() + "\n\n#ai"
+
     body = {
         "snippet": {
             "title": title[:100],
             "description": description,
-            "tags": tags or [],
+            "tags": tags,
             "categoryId": CATEGORY_IDS.get(brand, "26"),
         },
         "status": {
             "privacyStatus": "public",
             "selfDeclaredMadeForKids": False,
+            "containsSyntheticMedia": True,
         },
     }
 
