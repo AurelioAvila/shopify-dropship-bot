@@ -204,10 +204,22 @@ SUBCATEGORY_HOOKS = {
     ],
     # Spostati qui da PET_FEEDING il 2026-08-04: parlano di acqua, non di
     # cibo, e restando nello stesso pool finivano su prodotti-ciotola.
+    # Pool ampliato da 3 a 6 (2026-08-05, ricerca settimanale): unico
+    # sotto-pool ancora sotto la soglia di 5-6 hook applicata al resto del
+    # file dal 2026-08-02. Fontane/borracce d'acqua per cani restano segnalate
+    # come prodotto vincente 2026 (cjdropshipping.com, pbfulfill.com), quindi
+    # 3 hook per un video ogni pochi giorni si sarebbero ripetuti in fretta -
+    # nessuno storico anti-riuso protegge questo pool. Archetipi aggiunti
+    # (POV / mito da smontare / momento specifico) diversi dai tre esistenti
+    # (aneddoto / conseguenza / frustrazione), stessa regola di varieta' gia'
+    # applicata alle altre sottocategorie.
     "PET_HYDRATION": [
         "He used to drink from puddles on every walk because I forgot water.",
         "A thirsty dog on a hot walk is how a good afternoon turns into a vet visit.",
         "Carrying an open cup of water for him never once worked.",
+        "POV: your dog finally drinks on a walk instead of pulling toward every puddle.",
+        "The mistake is packing a bottle he can't actually drink from.",
+        "Halfway through every walk he stops, and it's never actually about being tired.",
     ],
     "PET_COMFORT": [
         "If your dog can't settle in summer, it's not restlessness, it's the heat.",
