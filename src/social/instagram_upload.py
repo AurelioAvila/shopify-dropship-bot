@@ -14,6 +14,16 @@ Flusso ufficiale (Content Publishing API, host graph.instagram.com):
 2. polling di /{creation_id}?fields=status_code finche' non e' FINISHED
 3. POST /{ig-user-id}/media_publish (creation_id) -> id del post pubblicato
 Il token va passato come Bearer nell'header Authorization, non come parametro.
+
+is_ai_generated=true (2026-08-05): l'AI Act europeo (Articolo 50) e' diventato
+legalmente vincolante il 2026-08-02 - multe fino a 15 milioni di euro o il 3%
+del fatturato globale per chi non etichetta contenuto generato/manipolato da
+IA. Ogni video di questa pipeline usa voce sintetica (TTS) e script generati,
+quindi rientra nell'obbligo. Questo e' il parametro NATIVO documentato da
+Meta (developers.facebook.com/docs/instagram-platform/content-publishing/)
+per farlo dichiarare all'account stesso, non solo un hashtag testuale che
+l'utente puo' ignorare - Instagram applica poi da solo l'etichetta "AI info"
+visibile sul post.
 """
 import os
 import time
@@ -31,7 +41,7 @@ def upload_reel(brand: str, video_url: str, caption: str) -> str:
     create_resp = requests.post(
         f"{API_BASE}/{ig_user_id}/media",
         headers=headers,
-        data={"media_type": "REELS", "video_url": video_url, "caption": caption},
+        data={"media_type": "REELS", "video_url": video_url, "caption": caption, "is_ai_generated": "true"},
     )
     if not create_resp.ok:
         print(f"[ERRORE] [{brand}] creazione media fallita: {create_resp.text}")

@@ -49,7 +49,17 @@ def _notify_telegram(brand: str, video_path: str, caption: str) -> None:
     l'endpoint bozze di TikTok non accetta una caption via API, quindi senza
     questo l'utente dovrebbe andare a cercarla a mano sul PC mentre pubblica
     dal telefono. Silenzioso se le credenziali non sono configurate (non deve
-    mai far fallire l'upload)."""
+    mai far fallire l'upload).
+
+    Include anche il promemoria sul toggle "Etichetta come generato da IA"
+    (2026-08-05): l'endpoint /inbox/video/init/ NON accetta post_info, quindi
+    is_aigc non e' impostabile via API per questo flusso - a differenza di
+    Instagram (is_ai_generated sul container) qui la dichiarazione la puo'
+    fare solo un umano nell'app TikTok al momento della pubblicazione dalla
+    bozza. L'AI Act europeo (Articolo 50) e' legalmente vincolante dal
+    2026-08-02, quindi il promemoria arriva proprio nel messaggio che
+    l'utente legge mentre sta per pubblicare, non in un posto che puo'
+    ignorare."""
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
     chat_id = os.environ.get("TELEGRAM_CHAT_ID")
     if not token or not chat_id:
@@ -68,7 +78,7 @@ def _notify_telegram(brand: str, video_path: str, caption: str) -> None:
         )
         requests.post(
             f"https://api.telegram.org/bot{token}/sendMessage",
-            data={"chat_id": chat_id, "text": caption},
+            data={"chat_id": chat_id, "text": f"{caption}\n\n🏷️ Ricorda: attiva \"Etichetta come generato da IA\" prima di pubblicare (obbligo di legge UE dal 2/8/2026)."},
             timeout=15,
         )
     except Exception as exc:
@@ -131,6 +141,12 @@ def upload_video(brand: str, video_path: str, caption: str, privacy_level: str =
                 "disable_duet": False,
                 "disable_comment": False,
                 "disable_stitch": False,
+                # is_aigc=true (2026-08-05): l'AI Act europeo (Articolo 50) e'
+                # legalmente vincolante dal 2026-08-02 - ogni video qui usa
+                # voce sintetica e script generati. E' il campo NATIVO
+                # dell'API di TikTok, non solo un hashtag: applica
+                # l'etichetta "Creator labeled as AI-generated" sul video.
+                "is_aigc": True,
             },
             "source_info": {
                 "source": "FILE_UPLOAD",
