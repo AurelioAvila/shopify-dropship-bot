@@ -14,3 +14,4 @@ client_secret_*.json
 # di rincorrerli uno per uno ogni volta che ne nasce uno nuovo (scoperto
 # 2026-08-04: run_sync_stock.bat era gia' fuori da questa protezione).
 run_*.bat
+data/hook_history.json

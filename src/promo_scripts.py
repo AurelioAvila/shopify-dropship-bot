@@ -11,7 +11,54 @@ video (vedi src/jobs/generate_promo_videos.py), ma parametrizzata cosi'
 copre tutti i 48 prodotti del catalogo senza doverli scrivere a mano uno
 per uno.
 """
+import json
+import os
 import random
+
+# --- Memoria degli hook gia' usati per sottocategoria (2026-08-05) -----------
+#
+# Trovato indagando Beffante: "I didn't expect a projector this size to
+# actually be watchable." e' uscito su TRE proiettori DIVERSI (id/cj_pid
+# distinti, l'anti-ripetizione prodotto del 2026-08-04 aveva gia' impedito
+# che fossero lo stesso item) in meno di 27 ore, e "Anyone still watching
+# movies on a laptop screen" due volte. hook = random.choice(hook_pool) non
+# aveva memoria: con pool da 6 elementi e poche estrazioni il repeat non e'
+# raro. Prodotto diverso ma hook identico si legge comunque come contenuto
+# ripostato a chi vede piu' di un video del canale - stessa famiglia del
+# fact_history.json costruito ieri per xn0time, qui applicata agli hook.
+HOOK_HISTORY_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "hook_history.json")
+HOOK_HISTORY_DEPTH = 2  # sul pool piu' piccolo (6) lascia comunque 4 alternative
+
+
+def _load_hook_history() -> dict:
+    try:
+        with open(HOOK_HISTORY_PATH) as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _save_hook_history(history: dict) -> None:
+    try:
+        os.makedirs(os.path.dirname(HOOK_HISTORY_PATH), exist_ok=True)
+        with open(HOOK_HISTORY_PATH, "w") as f:
+            json.dump(history, f, indent=1)
+    except Exception as exc:
+        print(f"Impossibile salvare hook_history.json: {exc}")
+
+
+def _pick_hook(pool: list, key: str) -> str:
+    """random.choice(pool) ma escludendo gli ultimi HOOK_HISTORY_DEPTH hook
+    usati per questa chiave (sottocategoria, o niche_default quando la
+    sottocategoria non e' riconosciuta)."""
+    history = _load_hook_history()
+    recent = history.get(key, [])[-HOOK_HISTORY_DEPTH:]
+    options = [h for h in pool if h not in recent] or list(pool)
+    hook = random.choice(options)
+    history[key] = (history.get(key, []) + [hook])[-HOOK_HISTORY_DEPTH:]
+    _save_hook_history(history)
+    return hook
+
 
 PET_KEYWORDS = (
     "dog", "cat", "pet", "paw", "puppy", "leash", "collar", "grooming",
@@ -556,7 +603,8 @@ def build_script_for_product(title: str, niche: str = None) -> tuple:
     }
     default_hooks, resolutions, closers = _pools[niche]
     hook_pool = SUBCATEGORY_HOOKS.get(subcategory) or default_hooks
-    hook = random.choice(hook_pool)
+    hook_key = subcategory or f"{niche}_default"
+    hook = _pick_hook(hook_pool, hook_key)
     # Il payoff SOSTITUISCE la resolution generica, non si aggiunge: e' la
     # risposta vera alla promessa dell'hook (vedi SUBCATEGORY_PAYOFFS).
     # Quando la sottocategoria non e' riconosciuta (_detect_subcategory puo'
@@ -607,7 +655,15 @@ def build_caption_for_product(title: str, niche: str, hook: str, value_first: bo
         # e su un account nuovo un tag da miliardi di view non emerge mai.
         "HOME": ["#desksetup", "#homeoffice", "#techfinds", "#gadgets", "#workfromhome"],
     }[niche]
-    tags = " ".join(random.sample(tag_pool, 3))
+    # #ai (2026-08-05): disclosure obbligatoria per voiceover sintetico sopra
+    # footage reale, sia per la policy TikTok aggiornata il 2026-07-21 (AI
+    # disclosure estesa dalle sole ads a tutti i contenuti, voci clonate/
+    # sintetiche incluse) sia per l'AI Act UE (art. 50, transparency
+    # obligations in vigore dal 2026-08-02). TikTok accetta la disclosure
+    # anche solo in caption, non serve il toggle nativo (comunque non
+    # esposto dall'endpoint bozze che usiamo). Sempre presente, non nel
+    # campionamento casuale del tag_pool.
+    tags = " ".join(random.sample(tag_pool, 3)) + " #ai"
     # value_first: la caption deve seguire il video. Se il voiceover non
     # vende, mettere "Shop the link in our bio" sotto lo rimetterebbe nella
     # casella "pubblicita'" agli occhi di chi legge e dell'algoritmo,
