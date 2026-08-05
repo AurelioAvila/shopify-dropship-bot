@@ -254,6 +254,88 @@ def bake_thumbnail_card(video_path: str, title: str, brand: str = None, card_sec
             os.remove(card_path)
 
 
+# --- Copertine per gli SHORT (2026-08-06) ------------------------------------
+#
+# Fino a oggi nessuno Short di nessun canale aveva una copertina propria:
+# la sceglieva YouTube da un fotogramma a caso. Verificato scaricando le
+# copertine reali - lo Short SoloFounded coybv9ToGsY mostrava un fotogramma
+# di meta' video con sopra il frammento di sottotitolo "more with less
+# that", tagliato a meta' frase. Identico al problema gia' documentato per
+# i long-form qui sopra, ma sugli Short, che valgono il 96% del traffico.
+#
+# Perche' NON basta caricare il fotogramma verticale cosi' com'e': provato
+# davvero (video di test rJrizdmPhA8) - YouTube accetta una 1080x1920 ma la
+# incastra dentro un 16:9 con due grosse bande nere ai lati, e nella ricerca
+# e su desktop il risultato sembra amatoriale. Provato anche il contrario
+# (16:9 pieno): la griglia Short del canale ne ritaglia la colonna centrale
+# e butta via i lati.
+#
+# Da qui il formato scelto: 1280x720 con il fotogramma NITIDO nella colonna
+# centrale 9:16 (l'unica zona che sopravvive a entrambe le viste) e lo
+# stesso fotogramma allargato e molto sfocato a riempire i lati.
+#
+# Il fotogramma e' preso a t=0: i nostri Short aprono tutti con la hook card
+# a schermo intero (vedi feedback_hook_card_frame_zero in memoria), quindi
+# il primo fotogramma contiene gia' la domanda/gancio leggibile e NON ha
+# ancora sottotitoli sovrapposti - controllato fotogramma per fotogramma,
+# a 0,4s compariva gia' "One of" troncato.
+SAFE_W = int(HEIGHT * 9 / 16)          # 405 px: colonna centrale 9:16
+SAFE_X0 = (WIDTH - SAFE_W) // 2
+SAFE_X1 = SAFE_X0 + SAFE_W
+
+
+def build_short_thumbnail(video_path: str, output_path: str, title: str = None,
+                          brand: str = None, at_seconds: float = 0.0) -> str:
+    """Copertina 1280x720 per uno Short, costruita dal suo primo fotogramma.
+
+    title: da passare SOLO per i formati che non hanno gia' del testo a
+    schermo nel primo fotogramma. Per quiz/ranking (che aprono con la
+    fascia del titolo) va lasciato None, altrimenti la stessa frase
+    compare due volte, una sopra l'altra - verificato guardando il
+    risultato reale prima di scegliere.
+    """
+    color = BRAND_COLORS.get((brand or "").upper(), DEFAULT_COLOR)
+    tmp_dir = os.path.dirname(os.path.abspath(output_path))
+    frame_path = os.path.join(tmp_dir, "_short_thumb_frame.jpg")
+
+    if not (video_path and _extract_frame(video_path, frame_path, at_seconds)):
+        # Nessun fotogramma: ripiega sulla copertina classica col titolo.
+        return build_thumbnail(title or "", output_path, video_path=video_path, brand=brand)
+
+    src = Image.open(frame_path).convert("RGB")
+
+    wide = src.resize((WIDTH, max(1, int(WIDTH * src.height / src.width))))
+    top = max(0, (wide.height - HEIGHT) // 2)
+    img = wide.crop((0, top, WIDTH, top + HEIGHT)).filter(ImageFilter.GaussianBlur(30))
+    img = Image.blend(img, Image.new("RGB", img.size, (0, 0, 0)), 0.60)
+
+    center_w = max(1, int(src.width * HEIGHT / src.height))
+    center = src.resize((center_w, HEIGHT))
+    left = max(0, (center_w - SAFE_W) // 2)
+    img.paste(center.crop((left, 0, left + SAFE_W, HEIGHT)), (SAFE_X0, 0))
+
+    draw = ImageDraw.Draw(img)
+    if title:
+        clean = " ".join(w for w in title.split() if not w.startswith("#")).strip()
+        font, lines = _fit_font(clean.upper(), SAFE_W - 48, HEIGHT - 200, max_lines=4)
+        line_h = font.size + 12
+        y = (HEIGHT - len(lines) * line_h) // 2
+        for line in lines:
+            w = draw.textbbox((0, 0), line, font=font)[2]
+            draw.text((SAFE_X0 + (SAFE_W - w) // 2, y), line, font=font,
+                      fill="white", stroke_width=5, stroke_fill=(0, 0, 0))
+            y += line_h
+
+    # Accento VERTICALE ai bordi della colonna sicura: una barra orizzontale
+    # in basso (come nella copertina long-form) verrebbe tagliata via dal
+    # ritaglio verticale della griglia Short.
+    draw.rectangle([(SAFE_X0 - 7, 0), (SAFE_X0 - 1, HEIGHT)], fill=color)
+    draw.rectangle([(SAFE_X1 + 1, 0), (SAFE_X1 + 7, HEIGHT)], fill=color)
+
+    img.save(output_path, "JPEG", quality=92)
+    return output_path
+
+
 def upload_thumbnail(youtube, video_id: str, thumbnail_path: str) -> bool:
     """Non solleva mai: se il canale non ha il telefono verificato l'API
     rifiuta le miniature personalizzate, e in quel caso e' molto meglio

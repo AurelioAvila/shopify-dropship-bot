@@ -92,8 +92,19 @@ def upload_video(brand: str, video_path: str, title: str, description: str, tags
     # miniatura conta pochissimo). upload_thumbnail non solleva mai, quindi un
     # canale senza telefono verificato non fa fallire una pubblicazione gia'
     # andata a buon fine.
-    if thumbnail_path:
-        from src.thumbnail import upload_thumbnail
+    try:
+        from src.thumbnail import build_short_thumbnail, upload_thumbnail
+
+        if not thumbnail_path:
+            # Short senza copertina esplicita (2026-08-06): finora la
+            # sceglieva YouTube da un fotogramma a caso, con addosso il
+            # sottotitolo troncato a meta' parola. Ora si costruisce dal
+            # primo fotogramma, che porta gia' la hook card del promo.
+            thumbnail_path = os.path.join(
+                os.path.dirname(os.path.abspath(video_path)), "thumbnail.jpg")
+            build_short_thumbnail(video_path, thumbnail_path, title=None, brand=brand)
         upload_thumbnail(youtube, response["id"], thumbnail_path)
+    except Exception as exc:
+        print(f"[thumbnail] non impostata ({exc}) - resta quella automatica", flush=True)
 
     return response["id"]
