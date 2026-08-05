@@ -19,6 +19,15 @@ CATEGORY_IDS = {
     "BEFFANTE": "28",   # Science & Technology (proiettori/webcam/smart home)
 }
 
+# Su YouTube non esiste il "link in bio" di IG/TikTok: la descrizione E' il
+# funnel. Ogni video chiude col link alla collezione del proprio brand -
+# handle verificati LIVE su /collections.json il 2026-08-06, non supposti.
+STORE_LINKS = {
+    "GROOMLYCO": "\U0001F6D2 Shop it here → https://91zey8-ha.myshopify.com/collections/groomlyco",
+    "MAGDOCK": "\U0001F6D2 Shop it here → https://91zey8-ha.myshopify.com/collections/magdock",
+    "BEFFANTE": "\U0001F6D2 Shop it here → https://91zey8-ha.myshopify.com/collections/beffante",
+}
+
 
 def _get_authenticated_service(brand: str):
     creds = Credentials(
@@ -44,6 +53,12 @@ def upload_video(brand: str, video_path: str, title: str, description: str, tags
     tags = list(tags or [])
     if not any(t.lower() == "ai" for t in tags):
         tags.append("ai")
+    store_link = STORE_LINKS.get(brand)
+    if store_link and "myshopify.com" not in description:
+        # In TESTA e non in coda: YouTube mostra solo le prime righe della
+        # descrizione senza "...altro", e il link e' l'unica azione che
+        # vogliamo dallo spettatore.
+        description = store_link + "\n\n" + description.lstrip()
     if "#ai" not in description.lower():
         description = description.rstrip() + "\n\n#ai"
 
