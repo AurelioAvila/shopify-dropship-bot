@@ -32,16 +32,32 @@ import requests
 
 API_BASE = "https://graph.instagram.com/v21.0"
 
+# audio_name per brand (2026-08-06): l'algoritmo tratta l'audio come un tag
+# di metadati con una propria pagina che raccoglie tutti i reel che lo
+# usano - un nome brandizzato coerente la trasforma in un hub del brand e
+# aggiunge una keyword di nicchia ricercabile. La musica di libreria via
+# API non esiste (va incorporata nel file video prima dell'upload).
+_AUDIO_NAME_BY_BRAND = {
+    "GROOMLYCO": "Groomlyco Pet Care Finds",
+    "MAGDOCK": "Magdock Tech Finds",
+    "BEFFANTE": "Beffante Desk Setup Finds",
+}
+
 
 def upload_reel(brand: str, video_url: str, caption: str) -> str:
     access_token = os.environ[f"INSTAGRAM_{brand}_ACCESS_TOKEN"]
     ig_user_id = os.environ[f"INSTAGRAM_{brand}_IG_USER_ID"]
     headers = {"Authorization": f"Bearer {access_token}"}
 
+    data = {"media_type": "REELS", "video_url": video_url, "caption": caption, "is_ai_generated": "true"}
+    audio_name = _AUDIO_NAME_BY_BRAND.get(brand.upper())
+    if audio_name:
+        data["audio_name"] = audio_name
+
     create_resp = requests.post(
         f"{API_BASE}/{ig_user_id}/media",
         headers=headers,
-        data={"media_type": "REELS", "video_url": video_url, "caption": caption, "is_ai_generated": "true"},
+        data=data,
     )
     if not create_resp.ok:
         print(f"[ERRORE] [{brand}] creazione media fallita: {create_resp.text}")

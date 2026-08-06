@@ -14,6 +14,7 @@ per uno.
 import json
 import os
 import random
+import re
 
 # --- Memoria degli hook gia' usati per sottocategoria (2026-08-05) -----------
 #
@@ -166,6 +167,16 @@ SUBCATEGORY_KEYWORDS = {
     "PET_FEEDING": ("feeder", "bowl", "food", "treat", "puzzle", "slow", "leakage"),
     "PET_HYDRATION": ("water", "bottle", "dispenser", "drink", "hydration"),
     "PET_COMFORT": ("bed", "mat", "pad", "cooling", "pillow", "blanket", "sleeping", "cushion"),
+    # PET_MOBILITY (2026-08-05): mancava del tutto. Rampe, scalette e tutori
+    # ortopedici sono una famiglia a se' - si comprano per un cane anziano,
+    # in sovrappeso o post-operatorio, non per comfort o toelettatura. Senza
+    # questa voce: "Foldable Pet Stairs" non matchava NESSUNA sottocategoria
+    # (ricadeva sugli hook generici sulla muta del pelo) e "Pet Knee Pads ...
+    # Brace" finiva in PET_COMFORT per via di "pad". Le keyword sono
+    # abbastanza specifiche da vincere sul singolo "pad"/"bed" residuo,
+    # perche' _detect_subcategory sceglie la sottocategoria con PIU' hit.
+    "PET_MOBILITY": ("ramp", "stairs", "step", "brace", "knee", "joint", "support",
+                     "recovery", "protector", "orthopedic", "arthritis", "hip"),
     "PET_WALKING": ("leash", "collar", "harness", "poop", "walking"),
     "PET_TOYS": ("toy", "ball", "chew", "interactive", "rope"),
     # Aggiunta 2026-08-06 (ricerca trend settimanale). "collar" e' gia' una
@@ -185,9 +196,38 @@ SUBCATEGORY_KEYWORDS = {
     # src/clients/cj_client.py, non solo citato nelle guide:
     # https://cjdropshipping.com/product/gps-pet-tracker-p-2DD6409D-362E-44AA-9390-416C37A3D1B5.html
     "PET_TRACKING": ("gps", "tracker", "locator", "anti-lost", "smart tag", "finder"),
+    # Vedi il commento sulle famiglie TECH aggiunte sotto: stesso audit.
+    "PET_ANXIETY": ("calming", "anxiety", "anxious", "thunder", "vest", "jumpsuit", "ear wrap"),
+    "PET_TRAVEL": ("car seat belt", "seat belt", "carrier", "travel"),
+    "PET_HYGIENE": ("diaper", "urine", "pee", "potty", "lint", "roller"),
     "TECH_CHARGING": ("charger", "charging", "wireless", "magsafe", "power", "cable", "usb", "adapter"),
     "TECH_CAR": ("car", "mount", "dashboard", "vent", "navigation", "bracket"),
-    "TECH_CASE": ("case", "cover", "protective", "wallet", "card holder", "lanyard", "crossbody"),
+    # Famiglie aggiunte 2026-08-05 dopo un audit su TUTTO il catalogo: 18
+    # prodotti su 132 (14%) non matchavano NESSUNA sottocategoria e
+    # ricadevano sul pool generico della nicchia - una dash cam riceveva
+    # l'hook "Your phone keeps sliding every time you brake", un tutore
+    # anti-ansia riceveva un hook sulla muta del pelo. Sono famiglie con un
+    # motivo d'acquisto completamente diverso, non varianti delle esistenti.
+    "TECH_DASHCAM": ("dash cam", "dashcam", "car recorder", "driving recorder", "carplay"),
+    "TECH_TRACKING": ("gps", "tracker", "locator", "positioning"),
+    "TECH_SCREEN": ("screen protector", "tempered glass", "front film", "screen film"),
+    "TECH_CASE": ("case", "cover", "protective"),
+    # TECH_WALLET separata da TECH_CASE il 2026-08-05. Nello stesso pool i due
+    # motivi d'acquisto convivevano ma sono opposti: una cover si compra per
+    # proteggere dagli urti, una wallet case per smettere di portare un
+    # portafoglio separato. Con la scelta casuale dentro il pool, una wallet
+    # case prendeva al 50% il payoff "Corners take the impact in almost every
+    # drop" - che non e' il motivo per cui la compri, ed e' proprio il
+    # difetto che il commento sopra SUBCATEGORY_HOOKS dichiarava di voler
+    # evitare. Sono 11 prodotti Magdock, non un caso isolato.
+    "TECH_WALLET": ("wallet", "card holder", "cardholder", "card case", "card slot"),
+    # TECH_CARRY (2026-08-05): lanyard/tracolla erano dentro TECH_CASE, i cui
+    # hook e payoff parlano tutti di cadute e angoli rinforzati. Verificato
+    # sul video gia' online per "Rhinestone Mobile Phone Lanyard Crossbody":
+    # voiceover "Most people find out their case is useless the hard way" +
+    # "Corners take the impact in almost every drop" su un accessorio che non
+    # protegge da niente - si compra per avere le mani libere.
+    "TECH_CARRY": ("lanyard", "crossbody", "phone chain", "strap", "sling", "neck holder"),
     "TECH_DESK": ("organizer", "stand", "desk", "storage", "bag", "holder"),
     # Beffante (2026-08-04): stesse quattro famiglie di prodotto che compongono
     # HOME_KEYWORDS, ma separate per non ripetere lo stesso hook generico su
@@ -198,6 +238,7 @@ SUBCATEGORY_KEYWORDS = {
     "HOME_ENTERTAINMENT": ("projector", "speaker"),
     "HOME_WEARABLE": ("smartwatch", "smart watch", "fitness tracker"),
     "HOME_WORKSPACE": ("laptop", "power bank"),
+    "HOME_COOLING": ("neck fan", "turbo fan", "fan", "bladeless"),
 }
 
 SUBCATEGORY_HOOKS = {
@@ -293,6 +334,19 @@ SUBCATEGORY_HOOKS = {
         "Panting through the night isn't normal, it's a signal.",
         "The floor is winning against a bed you paid good money for.",
     ],
+    # PET_MOBILITY (2026-08-05, vedi SUBCATEGORY_KEYWORDS). Registro
+    # volutamente diverso dalle altre pet: qui chi guarda ha un cane che sta
+    # invecchiando o si e' fatto male, quindi niente toni da "life hack" -
+    # sono gli stessi archetipi (prima persona / conseguenza / momento
+    # specifico / mito da smontare) ma su una preoccupazione reale.
+    "PET_MOBILITY": [
+        "The day he stopped jumping on the couch I realized he'd gotten old.",
+        "He didn't get lazy, jumping down just started to hurt.",
+        "Nobody warns you that the jump down is worse for their joints than the jump up.",
+        "The vet asked one question about my sofa and it explained the limp.",
+        "If your dog hesitates before jumping, that hesitation is the whole message.",
+        "Watching a big dog struggle into the car is when it finally clicked.",
+    ],
     "PET_WALKING": [
         "If your dog pulls the whole walk, the leash is half the problem.",
         "The mistake almost everyone makes on walks shows up months later.",
@@ -344,9 +398,26 @@ SUBCATEGORY_HOOKS = {
         "Waist height onto tile is what actually breaks screens, not big falls.",
         "A repair quote costs more than every case I've ever bought combined.",
         "Thin and protective used to be a trade-off. It isn't anymore.",
+    ],
+    # Spostati qui da TECH_CASE il 2026-08-05 (vedi SUBCATEGORY_KEYWORDS):
+    # parlano di non portare un secondo oggetto, non di cadute.
+    "TECH_WALLET": [
         "I stopped carrying a separate wallet the day I got one of these.",
         "Losing my actual wallet twice in a year is what finally got me to switch.",
         "Cards, cash, ID, one thing in my pocket instead of two.",
+        "Nobody needs a wallet, a phone and a set of keys all in the same pocket.",
+        "POV: you leave the house with one thing instead of three.",
+        "The back pocket bulge was doing my posture no favours either.",
+    ],
+    # TECH_CARRY (2026-08-05, vedi SUBCATEGORY_KEYWORDS): mani libere e non
+    # perdere il telefono, mai protezione dagli urti.
+    "TECH_CARRY": [
+        "Holding my phone in one hand all day was the problem I didn't know I had.",
+        "I dropped my phone twice in a week before I gave up and tried this.",
+        "POV: your hands are full and your phone is still exactly where you left it.",
+        "Nobody tells you how much easier travelling gets without a phone in your palm.",
+        "The pocket isn't the issue, it's that you take it out forty times a day.",
+        "I stopped putting my phone down on tables I'd walk away from.",
     ],
     "TECH_DESK": [
         "One bag instead of digging through a drawer of tangled cables.",
@@ -355,6 +426,66 @@ SUBCATEGORY_HOOKS = {
         "I've bought the same charger three times because I couldn't find it.",
         "The drawer isn't messy, it just has no system at all.",
         "Five minutes of packing turns into twenty when nothing has a place.",
+    ],
+    # Famiglie aggiunte 2026-08-05 (vedi SUBCATEGORY_KEYWORDS). Stessa regola
+    # di varieta' del resto del file: archetipi diversi tra loro (prima
+    # persona / conseguenza / POV / momento specifico / mito da smontare),
+    # non variazioni della stessa formula.
+    "TECH_DASHCAM": [
+        "Someone reversed into me and drove off, and it was my word against nothing.",
+        "The insurance call goes very differently when you have the footage.",
+        "Nobody buys one of these until the week after they needed it.",
+        "POV: the other driver changes their story the moment you mention the camera.",
+        "It's not about crashes, it's about the argument afterwards.",
+        "I found out what my car does while it's parked and I wasn't ready.",
+    ],
+    "TECH_TRACKING": [
+        "My bike was gone in under a minute and I had nothing to give the police.",
+        "The moment you actually need this, it's already too late to buy one.",
+        "POV: you open the app and your scooter is three streets away.",
+        "Nobody thinks about this until something expensive walks off.",
+        "It cost less than the excess on my insurance claim.",
+        "Knowing exactly where it is turns a disaster into a phone call.",
+    ],
+    "TECH_SCREEN": [
+        "Waist height onto tile is what actually cracks screens, not the dramatic falls.",
+        "A repair quote costs more than every protector I've ever bought combined.",
+        "I skipped this once and paid for it within a month.",
+        "The scratch that ruins a screen comes from your pocket, not a drop.",
+        "POV: it hits the pavement face down and you don't even flinch.",
+        "Nobody regrets putting one on, plenty regret not bothering.",
+    ],
+    "PET_ANXIETY": [
+        "Fireworks night used to mean a dog shaking behind the sofa until morning.",
+        "He isn't being dramatic during storms, he genuinely can't settle.",
+        "The vet suggested this before anything stronger, and I was sceptical.",
+        "Nobody tells you how much a scared dog can't be talked out of it.",
+        "The car journey was the problem, not the destination.",
+        "I tried everything else first, which is the part I'd skip if I did it again.",
+    ],
+    "PET_HYGIENE": [
+        "The accidents weren't the problem, the cleanup after them was.",
+        "Nobody warns you how much of dog ownership is just laundry.",
+        "An older dog having accidents isn't misbehaviour, it's usually not their fault.",
+        "I was washing the same rug twice a week before I gave up.",
+        "The fur on black trousers is its own separate hobby.",
+        "POV: you stop finding surprises in the hallway every morning.",
+    ],
+    "PET_TRAVEL": [
+        "One hard brake with a loose dog in the back is all it takes.",
+        "He used to slide off the seat every time I stopped, and I just accepted it.",
+        "Nobody thinks about what an unrestrained dog does in a crash.",
+        "The car smelled like wet dog for two years before I fixed this.",
+        "POV: the whole drive and he never once climbed into the front.",
+        "It's the cheapest thing in the car that actually matters.",
+    ],
+    "HOME_COOLING": [
+        "The office hit thirty degrees and the building's AC gave up in July.",
+        "A desk fan blowing paper everywhere isn't a solution, it's a second problem.",
+        "POV: your hands are free and you're still not sweating through your shirt.",
+        "Nobody tells you the commute is the worst part of a heatwave.",
+        "I stopped fighting over the office thermostat and just sorted myself out.",
+        "The one summer purchase I actually used every single day.",
     ],
     "HOME_STREAMING": [
         "If your laptop webcam makes you look like you're in a hostage video, this is for you.",
@@ -401,6 +532,54 @@ SUBCATEGORY_HOOKS = {
 
 _SUBCATEGORY_PREFIX = {"PET": "PET_", "TECH": "TECH_", "HOME": "HOME_"}
 
+# Keyword che DEFINISCONO cos'e' l'oggetto, e quindi vincono un pareggio.
+#
+# Perche' (2026-08-05): "PawHut Dog Ramp For Bed, Pet Ramp For Dogs With
+# Non-Slip Carpet" pesca 1 hit in PET_MOBILITY ("ramp") e 1 hit in
+# PET_COMFORT ("bed"), e a parita' vinceva semplicemente chi veniva prima nel
+# dizionario - cioe' PET_COMFORT, che assegnava alla rampa l'hook sul cane
+# che si sdraia sulle piastrelle per il caldo. Ma "bed" li' dentro descrive
+# DOVE va la rampa, non cos'e' l'oggetto: "ramp" e' l'unica parola che dice
+# cosa stai comprando. Verificato che il solo match a parola intera non
+# bastava a risolverlo.
+#
+# Regola: se una di queste parole compare, quella sottocategoria vince anche
+# a pari punteggio. Restano volutamente poche e inequivocabili - un oggetto
+# puo' essere "per il letto" o "da auto", ma se e' una rampa e' una rampa.
+SUBCATEGORY_DEFINING = {
+    "PET_MOBILITY": ("ramp", "stairs", "brace", "knee"),
+    "PET_ANXIETY": ("calming", "anxiety", "ear wrap"),
+    "PET_HYGIENE": ("diaper", "urine", "lint"),
+    "PET_TRAVEL": ("car seat belt", "seat belt", "carrier"),
+    "TECH_DASHCAM": ("dash cam", "dashcam", "car recorder", "carplay"),
+    "TECH_TRACKING": ("gps", "tracker", "locator"),
+    "TECH_SCREEN": ("screen protector", "tempered glass", "front film"),
+    "TECH_CARRY": ("lanyard", "crossbody", "phone chain"),
+    "TECH_WALLET": ("wallet", "card holder", "cardholder"),
+    "HOME_COOLING": ("neck fan", "turbo fan", "bladeless"),
+}
+
+
+def _keyword_hits(keyword: str, text: str) -> bool:
+    """True se `keyword` compare in `text` come PAROLA INTERA (plurale
+    ammesso), non come sottostringa.
+
+    Bug reale trovato 2026-08-05 eseguendo _detect_subcategory sui prodotti
+    gia' pubblicati:
+      - "PawHut Dog Ramp For Bed" -> PET_GROOMING, perche' "paw" (keyword
+        aggiunta il 2026-08-05 per i lavazampe) compare dentro il NOME DEL
+        MARCHIO "PawHut". Una rampa per cani anziani riceveva un voiceover
+        sul conto del toelettatore e su come spazzolare.
+      - "Pet Knee Pads ... Thigh Brace ... Support Belt" -> PET_COMFORT,
+        perche' "pad" compare dentro "Pads". Un tutore post-operatorio
+        riceveva l'hook "Panting through the night isn't normal" e il payoff
+        sulla dispersione del calore dalle zampe.
+    Entrambi verificati sui video realmente online, non ipotetici. Il match
+    a sottostringa e' comodo finche' le keyword sono lunghe ("grooming"),
+    ma con keyword corte di 3-4 lettere pesca dentro altre parole.
+    """
+    return re.search(rf"\b{re.escape(keyword)}s?\b", text) is not None
+
 
 def _detect_subcategory(title: str, niche: str) -> str:
     """Bug trovato 2026-08-04: prima del terzo brand (Beffante/HOME) questa
@@ -409,16 +588,26 @@ def _detect_subcategory(title: str, niche: str) -> str:
     webcam) veniva confrontato con le sottocategorie TECH_* e "usb"
     (TECH_CHARGING) gli assegnava un hook su caricabatterie che si scaricano,
     lo stesso tipo di incoerenza hook/prodotto gia' corretta una volta per
-    Groomlyco/Magdock. Ora ogni niche cerca solo nelle proprie sottocategorie."""
+    Groomlyco/Magdock. Ora ogni niche cerca solo nelle proprie sottocategorie.
+
+    Match a parola intera dal 2026-08-05 (vedi _keyword_hits)."""
     t = title.lower()
     prefix = _SUBCATEGORY_PREFIX.get(niche, "TECH_")
-    best, best_hits = None, 0
+    best, best_score = None, (0, 0)
     for sub, keywords in SUBCATEGORY_KEYWORDS.items():
         if not sub.startswith(prefix):
             continue
-        hits = sum(1 for k in keywords if k in t)
-        if hits > best_hits:
-            best, best_hits = sub, hits
+        hits = sum(1 for k in keywords if _keyword_hits(k, t))
+        if not hits:
+            continue
+        # Il punteggio e' (parola definitoria presente, numero di hit): una
+        # keyword definitoria vince sempre su un pareggio di conteggio, ma
+        # tra due sottocategorie definitorie decide comunque il numero di
+        # hit. Vedi SUBCATEGORY_DEFINING per il caso reale che lo motiva.
+        defining = any(_keyword_hits(k, t) for k in SUBCATEGORY_DEFINING.get(sub, ()))
+        score = (1 if defining else 0, hits)
+        if score > best_score:
+            best, best_score = sub, score
     return best
 
 
@@ -545,6 +734,10 @@ SUBCATEGORY_PAYOFFS = {
         "Dogs lose heat through their paws and belly, not by sweating, so a cool surface does more than a fan ever will.",
         "That's why he picks the tiles: he's looking for something that pulls heat away, and a padded bed traps it instead.",
     ],
+    "PET_MOBILITY": [
+        "Landing takes several times a dog's body weight through the front legs, which is why the jump down is what wears the joints out.",
+        "Once a dog starts avoiding a jump the joint is already sore, so the ramp is easier to introduce before that point than after.",
+    ],
     "PET_WALKING": [
         "Pulling is leverage, not disobedience, so moving the clip to the chest takes the leverage away without correcting him.",
         "A harness that sits on the shoulders lets him pull with his whole body, which is why your arm gives out first.",
@@ -566,12 +759,50 @@ SUBCATEGORY_PAYOFFS = {
         "Every brake and pothole is a small drop test, which is why grip strength matters more than how the mount looks.",
     ],
     "TECH_CASE": [
-        "A wallet case isn't about protection, it's about not carrying a second thing, which is the part reviews never mention.",
         "Corners take the impact in almost every drop, so raised corners do more than a thicker back ever will.",
+        "Most cracks come from a short fall onto a hard edge, not a big drop, which is why a raised lip matters more than thickness.",
+    ],
+    "TECH_WALLET": [
+        "A wallet case isn't about protection, it's about not carrying a second thing, which is the part reviews never mention.",
+        "Two or three cards covers almost every day out, which is why a slim holder replaces a full wallet more often than people expect.",
+    ],
+    "TECH_CARRY": [
+        "Most phones get dropped while being carried, not while being used, which is why the fix is not holding it at all.",
+        "A strap that sits across the body keeps the weight off your wrist, so you stop setting the phone down on random surfaces.",
     ],
     "TECH_DESK": [
         "Cable mess isn't a tidiness problem, it's a length problem, so shortening the run fixes what clips never will.",
         "A stand that lifts the screen to eye level does more for your neck than any chair adjustment.",
+    ],
+    # Famiglie aggiunte 2026-08-05. Stessa regola del resto del file: nessuna
+    # statistica inventata, spiegazioni di meccanismo verificabili.
+    "TECH_DASHCAM": [
+        "Most disputes come down to who was where, so a timestamped clip settles in seconds what a statement argues for weeks.",
+        "Loop recording matters more than resolution, because a camera that stopped recording last Tuesday protects nothing today.",
+    ],
+    "TECH_TRACKING": [
+        "Recovery depends on how fast you can say where it is, which is why live location beats any alarm.",
+        "Thieves move a stolen bike in minutes, so the useful window is the first hour, not the police report.",
+    ],
+    "TECH_SCREEN": [
+        "Glass fails from surface scratches spreading under impact, so the small daily scuffs are what set up the big crack.",
+        "A protector works by breaking instead of your screen, which is why replacing one is the entire point.",
+    ],
+    "PET_ANXIETY": [
+        "Constant gentle pressure calms the nervous system, the same principle behind a weighted blanket for people.",
+        "Noise anxiety builds over years rather than appearing suddenly, so managing it early matters more than waiting it out.",
+    ],
+    "PET_HYGIENE": [
+        "Odour is what makes a dog return to the same indoor spot, so neutralising it matters more than cleaning it.",
+        "Incontinence in older dogs is physical, not behavioural, which is why correcting it never works and managing it does.",
+    ],
+    "PET_TRAVEL": [
+        "An unrestrained dog keeps moving at the car's speed in a crash, which is the part people don't picture.",
+        "Most dogs settle better when they can't see out of every window, so restricting movement calms them rather than stressing them.",
+    ],
+    "HOME_COOLING": [
+        "Airflow over skin cools by speeding up evaporation, which is why moving air beats a colder room that's still.",
+        "Cooling the neck works disproportionately well because major blood vessels run close to the surface there.",
     ],
     "HOME_STREAMING": [
         "Bad video is almost always bad light, not a bad camera, so lighting your face beats upgrading the lens.",

@@ -51,15 +51,13 @@ def _notify_telegram(brand: str, video_path: str, caption: str) -> None:
     dal telefono. Silenzioso se le credenziali non sono configurate (non deve
     mai far fallire l'upload).
 
-    Include anche il promemoria sul toggle "Etichetta come generato da IA"
-    (2026-08-05): l'endpoint /inbox/video/init/ NON accetta post_info, quindi
-    is_aigc non e' impostabile via API per questo flusso - a differenza di
-    Instagram (is_ai_generated sul container) qui la dichiarazione la puo'
-    fare solo un umano nell'app TikTok al momento della pubblicazione dalla
-    bozza. L'AI Act europeo (Articolo 50) e' legalmente vincolante dal
-    2026-08-02, quindi il promemoria arriva proprio nel messaggio che
-    l'utente legge mentre sta per pubblicare, non in un posto che puo'
-    ignorare."""
+    Il promemoria sul toggle "Etichetta come generato da IA" e' stato TOLTO
+    dal messaggio su richiesta esplicita dell'utente (2026-08-05: "ormai so
+    che devo aggiungere l'etichetta AI"). L'obbligo resta - l'endpoint
+    /inbox/video/init/ non accetta post_info, quindi is_aigc non e'
+    impostabile via API e la dichiarazione la fa l'utente in app - ma il
+    messaggio Telegram torna a contenere solo la caption pura, selezionabile
+    e incollabile senza doverla ripulire."""
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
     chat_id = os.environ.get("TELEGRAM_CHAT_ID")
     if not token or not chat_id:
@@ -78,7 +76,7 @@ def _notify_telegram(brand: str, video_path: str, caption: str) -> None:
         )
         requests.post(
             f"https://api.telegram.org/bot{token}/sendMessage",
-            data={"chat_id": chat_id, "text": f"{caption}\n\n🏷️ Ricorda: attiva \"Etichetta come generato da IA\" prima di pubblicare (obbligo di legge UE dal 2/8/2026)."},
+            data={"chat_id": chat_id, "text": caption},
             timeout=15,
         )
     except Exception as exc:

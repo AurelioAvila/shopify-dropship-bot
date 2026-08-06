@@ -214,7 +214,10 @@ def _normalize_loudness(path: str) -> None:
         "ffmpeg", "-y", "-i", path,
         "-c:v", "copy",
         "-af", LOUDNORM_FILTER,
-        "-c:a", "aac", "-b:a", "192k",
+        # -ar 48000 esplicito (2026-08-06): loudnorm lavora internamente a
+        # 192 kHz e senza sample rate imposto trascinava l'encoder a 96 kHz
+        # (misurato sui video reali). 48 kHz e' lo standard per il video.
+        "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
         # Questa passata rimuxa: senza ri-specificare +faststart il moov atom
         # tornerebbe in fondo, riportando il bug del "primo tap non parte".
         "-movflags", "+faststart",
