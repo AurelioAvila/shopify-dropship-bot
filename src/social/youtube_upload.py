@@ -67,6 +67,13 @@ def upload_video(brand: str, video_path: str, title: str, description: str, tags
             "title": title[:100],
             "description": description,
             "tags": tags,
+            # Lingua dichiarata esplicitamente (2026-08-06): senza, YouTube la
+            # rileva da solo e sbaglia (il video di test con titolo/desc corti
+            # e' stato marcato "it") - e la lingua rilevata e' anche la base
+            # dell'auto-doppiaggio. Il contenuto e' inglese per regola di
+            # progetto, quindi si dichiara e basta.
+            "defaultLanguage": "en",
+            "defaultAudioLanguage": "en",
             "categoryId": CATEGORY_IDS.get(brand, "26"),
         },
         "status": {
