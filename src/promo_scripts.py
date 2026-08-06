@@ -168,6 +168,23 @@ SUBCATEGORY_KEYWORDS = {
     "PET_COMFORT": ("bed", "mat", "pad", "cooling", "pillow", "blanket", "sleeping", "cushion"),
     "PET_WALKING": ("leash", "collar", "harness", "poop", "walking"),
     "PET_TOYS": ("toy", "ball", "chew", "interactive", "rope"),
+    # Aggiunta 2026-08-06 (ricerca trend settimanale). "collar" e' gia' una
+    # keyword PET_WALKING, quindi senza questa voce un GPS tracker con
+    # "collar" nel titolo (comune sui nomi CJ, es. "GPS Pet Tracker Collar
+    # Anti-Lost Smart Locator") avrebbe preso un hook su tiraggio al
+    # guinzaglio - lo stesso mismatch hook/prodotto gia' corretto per i paw
+    # cleaner (PET_GROOMING, 2026-08-04) e le borracce (PET_HYDRATION,
+    # 2026-08-05). Le keyword qui sotto (gps/tracker/locator/anti-lost/smart
+    # tag/finder) pesano piu' di "collar" da sole, quindi _detect_subcategory
+    # (punteggio a match piu' alto) sceglie questa e non PET_WALKING.
+    # Fonte: Zendrop elenca i GPS pet tracker tra i prodotti pet dropshipping
+    # di tendenza 2026 sia nella guida sia nella propria categoria "GPS
+    # Tracking Devices" (https://www.zendrop.com/blog/dropshipping-pet-products/,
+    # https://www.zendrop.com/tech-products/). Il prodotto e' anche
+    # effettivamente reperibile dal fornitore che questo bot gia' usa via
+    # src/clients/cj_client.py, non solo citato nelle guide:
+    # https://cjdropshipping.com/product/gps-pet-tracker-p-2DD6409D-362E-44AA-9390-416C37A3D1B5.html
+    "PET_TRACKING": ("gps", "tracker", "locator", "anti-lost", "smart tag", "finder"),
     "TECH_CHARGING": ("charger", "charging", "wireless", "magsafe", "power", "cable", "usb", "adapter"),
     "TECH_CAR": ("car", "mount", "dashboard", "vent", "navigation", "bracket"),
     "TECH_CASE": ("case", "cover", "protective", "wallet", "card holder", "lanyard", "crossbody"),
@@ -291,6 +308,18 @@ SUBCATEGORY_HOOKS = {
         "I came home to a shredded sofa and finally understood the pattern.",
         "The chewing stops when the brain has something else to do.",
         "You're not buying a toy, you're buying twenty quiet minutes.",
+    ],
+    # Aggiunta 2026-08-06, stessa ricerca trend di SUBCATEGORY_KEYWORDS sopra:
+    # prima di questa sottocategoria un tracker GPS sarebbe caduto su
+    # PET_WALKING (via la keyword "collar") con hook su guinzaglio/tiraggio,
+    # incoerenti col vero motivo per cui si compra un localizzatore.
+    "PET_TRACKING": [
+        "If your dog has ever bolted through an open gate, this one's for you.",
+        "I checked my phone forty times the day he slipped his collar.",
+        "POV: he's not in the yard, and you don't know which direction he went.",
+        "A tag with your number on it only works if a stranger finds him first.",
+        "The scariest ten minutes of my week started with a front door left open.",
+        "Every escape happens on the one day you weren't watching the yard.",
     ],
     "TECH_CHARGING": [
         "One clean setup instead of a tangled mess of cables every night.",
@@ -523,6 +552,10 @@ SUBCATEGORY_PAYOFFS = {
     "PET_TOYS": [
         "Destructive chewing is almost always boredom, so the fix is a toy that takes work to solve, not a tougher toy.",
         "A toy that gives up its treat too easily gets abandoned in minutes, which is why difficulty matters more than durability.",
+    ],
+    "PET_TRACKING": [
+        "A tag only helps once he's found; live GPS shows you where he is while you're still looking, not after.",
+        "The cheap trackers update rarely, so by the time you check the app he's already moved somewhere else.",
     ],
     "TECH_CHARGING": [
         "Wireless charging loses most of its speed to misalignment, so a magnet that centres the coil matters more than the wattage.",
