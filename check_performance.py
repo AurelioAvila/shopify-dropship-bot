@@ -15,14 +15,26 @@ Uso:
     python check_performance.py --brand magdock  # uno solo
 """
 import argparse
+import io
 import os
 import re
+import sys
 from datetime import datetime, timezone
 
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 
 import src.config  # noqa: F401  - carica .env / variabili d'ambiente
+
+# La console di Windows usa cp1252 (non UTF-8): gli emoji nei nomi/URL dei
+# canali (es. "🎥") facevano crashare ogni print con UnicodeEncodeError,
+# interrompendo il controllo a meta' - segnalato dal Direttore il 2026-08-06
+# (recuperato solo forzando PYTHONIOENCODING=utf-8 a mano). errors="replace"
+# invece di "strict": un log leggermente sporco (un carattere sostituito da
+# "?") e' molto meglio di un controllo che non finisce.
+if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
 BRANDS = ["groomlyco", "magdock", "beffante"]
 
