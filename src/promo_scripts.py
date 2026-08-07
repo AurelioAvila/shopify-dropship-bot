@@ -415,7 +415,7 @@ SUBCATEGORY_HOOKS = {
         "Holding my phone in one hand all day was the problem I didn't know I had.",
         "I dropped my phone twice in a week before I gave up and tried this.",
         "POV: your hands are full and your phone is still exactly where you left it.",
-        "Nobody tells you how much easier travelling gets without a phone in your palm.",
+        "Nobody tells you how much easier traveling gets without a phone in your palm.",
         "The pocket isn't the issue, it's that you take it out forty times a day.",
         "I stopped putting my phone down on tables I'd walk away from.",
     ],
@@ -466,7 +466,7 @@ SUBCATEGORY_HOOKS = {
     "PET_HYGIENE": [
         "The accidents weren't the problem, the cleanup after them was.",
         "Nobody warns you how much of dog ownership is just laundry.",
-        "An older dog having accidents isn't misbehaviour, it's usually not their fault.",
+        "An older dog having accidents isn't misbehavior, it's usually not their fault.",
         "I was washing the same rug twice a week before I gave up.",
         "The fur on black trousers is its own separate hobby.",
         "POV: you stop finding surprises in the hallway every morning.",
@@ -927,7 +927,12 @@ def build_caption_for_product(title: str, niche: str, hook: str, value_first: bo
     # anche solo in caption, non serve il toggle nativo (comunque non
     # esposto dall'endpoint bozze che usiamo). Sempre presente, non nel
     # campionamento casuale del tag_pool.
-    tags = " ".join(random.sample(tag_pool, 3)) + " #ai"
+    # Broad tag a rotazione (2026-08-06, richiesta utente): la ricerca 2026
+    # dice che i generici da soli non spingono, ma un tag in piu' alza views
+    # (~+5%) e interazioni (~+10%) - quindi si AGGIUNGE ai niche tag, mai al
+    # loro posto.
+    broad = random.choice(["#fyp", "#viral", "#foryou", "#blowthisup", "#fypage"])
+    tags = " ".join(random.sample(tag_pool, 3)) + f" {broad} #ai"
     # value_first: la caption deve seguire il video. Se il voiceover non
     # vende, mettere "Shop the link in our bio" sotto lo rimetterebbe nella
     # casella "pubblicita'" agli occhi di chi legge e dell'algoritmo,
