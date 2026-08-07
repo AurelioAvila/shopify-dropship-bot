@@ -21,6 +21,10 @@ import subprocess
 from datetime import datetime
 
 from src.clients.cj_client import CJClient
+from src.promo_scripts import (HOME_CLOSERS, HOME_RESOLUTIONS, PET_CLOSERS,
+                               PET_RESOLUTIONS, SUBCATEGORY_PAYOFFS,
+                               TECH_CLOSERS, TECH_RESOLUTIONS,
+                               _detect_subcategory)
 from src.render_promo import LowResolutionError, build_promo_video
 from src.social.youtube_upload import upload_video
 from src.store import get_conn
@@ -69,6 +73,14 @@ NICHE_KEYWORDS = {
 
 _ORDINALS = ["First", "Second", "Third", "Fourth", "Fifth", "Sixth", "Seventh", "Eighth"]
 
+# Brand -> codice nicchia usato da promo_scripts._detect_subcategory (PET/
+# TECH/HOME), stessa mappa gia' invertita in src/jobs/daily_promo.py
+# (BRAND_BY_NICHE) - qui serve nel verso opposto per passare la nicchia
+# giusta al motore hook/payoff riusato da _segment_script sotto.
+_BRAND_TO_NICHE = {"GROOMLYCO": "PET", "MAGDOCK": "TECH", "BEFFANTE": "HOME"}
+_NICHE_DEFAULT_PAYOFFS = {"PET": PET_RESOLUTIONS, "TECH": TECH_RESOLUTIONS, "HOME": HOME_RESOLUTIONS}
+_NICHE_CLOSERS = {"PET": PET_CLOSERS, "TECH": TECH_CLOSERS, "HOME": HOME_CLOSERS}
+
 
 def _niche_products(cj: CJClient, conn, brand: str, n: int) -> list:
     # Sovra-pesca candidati (n*3): alcuni verranno scartati in generate()
@@ -93,13 +105,40 @@ def _niche_products(cj: CJClient, conn, brand: str, n: int) -> list:
     return picked
 
 
-def _segment_script(rank: int, total: int, title: str) -> str:
+def _segment_script(rank: int, total: int, title: str, brand: str) -> str:
+    """Numero + titolo (necessari per l'ordine della classifica), poi un
+    payoff REALE - una spiegazione di meccanismo, non un placeholder - e una
+    chiusura variata per nicchia.
+
+    Bug trovato 2026-08-07 (routine di manutenzione). A differenza degli
+    Shorts (src/promo_scripts.py, vedi il commento sopra SUBCATEGORY_PAYOFFS
+    sullo stesso identico difetto gia' corretto li' il 2026-08-04), questo
+    file non era mai stato collegato al motore hook/payoff per
+    sottocategoria: OGNI segmento di OGNI buying guide, per tutti e tre i
+    brand, chiudeva con la frase placeholder fissa "Here's why it's worth
+    it. Look at the result." - la stessa promessa vuota mai pagata e la
+    stessa chiusura identica su ogni video che promo_scripts.py chiama "uno
+    dei segnali piu' riconoscibili di contenuto generato in serie".
+    La ricerca 2026 (beautyshopcreators.com/tiktok-content-that-converts,
+    consultata 2026-08-07) misura che i formati comparativi ("dupes",
+    8.4-7.6%) battono l'haul/lista generica (2.3%) solo quando ogni voce
+    porta una ragione concreta, non per la sola struttura a classifica -
+    esattamente cio' che qui mancava.
+    Riusa SUBCATEGORY_PAYOFFS/_detect_subcategory gia' scritti e verificati
+    per gli Shorts, stesso pattern di riuso gia' in uso in
+    src/jobs/daily_promo.py, invece di inventare nuove spiegazioni.
+    """
     short_title = title.split(",")[0][:50]
     if rank == total:
         opener = f"And the number one pick: {short_title}."
     else:
         opener = f"Number {total - rank + 1}: {short_title}."
-    return f"{opener} Here's why it's worth it. Look at the result."
+    niche = _BRAND_TO_NICHE.get(brand, "TECH")
+    subcategory = _detect_subcategory(title, niche)
+    payoff_pool = SUBCATEGORY_PAYOFFS.get(subcategory) or _NICHE_DEFAULT_PAYOFFS[niche]
+    payoff = random.choice(payoff_pool)
+    closer = random.choice(_NICHE_CLOSERS[niche])
+    return f"{opener} {payoff} {closer}"
 
 
 def generate(brand: str, n: int = 6) -> str:
@@ -124,7 +163,7 @@ def generate(brand: str, n: int = 6) -> str:
             break
         i = len(used_products) + 1
         print(f"[{brand}] Genero segmento {i}/{n}: {p['title'][:50]}...")
-        script = _segment_script(i, n, p["title"])
+        script = _segment_script(i, n, p["title"], brand)
         clip_path = os.path.join(OUTPUT_DIR, f"_segment_{brand}_{i}.mp4")
         tmp_dir = os.path.join(OUTPUT_DIR, f"_tmp_{brand}_{i}")
         try:
