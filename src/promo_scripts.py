@@ -109,6 +109,25 @@ _SHARE_CTAS = [
 # Strike, Open Loop, Confession - con Identity Call primo assoluto (85 di
 # media) perche' nomina in faccia il pubblico a cui parla. Mancava del tutto
 # in entrambe le nicchie, aggiunto ora.
+#
+# Aggiornamento ricerca trend 2026-08-08 (routine di manutenzione, formato
+# review/unboxing prodotto segnalato come categoria Shorts top di periodo):
+# un quinto pattern manca ancora del tutto, ed e' quello che nel 2026 misura
+# meglio degli altri quattro. L'analisi di OpusClip su 34.000 TikTok del Q1
+# 2026 classifica "Product/Outcome Showcase" - mostrare il risultato gia'
+# ottenuto nei primi 2 secondi, senza preambolo, invece di annunciare un
+# problema - come l'archetipo con piu' views medie in assoluto (~6.000/clip,
+# 2x il tipo piu' debole): https://www.opus.pro/blog/tiktok-hooks-that-go-viral-2026
+# vidIQ conferma la stessa direzione lato YouTube Shorts: gli hook "Specific
+# Outcome" battono la reveal prodotto generica del 35-45% sulla retention a 3
+# secondi: https://vidiq.com/blog/post/viral-video-hooks-youtube-shorts/
+# Nessuno dei quattro pattern gia' in uso apre col risultato gia' ottenuto
+# (Identity Call nomina il pubblico, Contrarian smonta un mito, Open Loop
+# promette, Confession racconta in prima persona un errore) - tutti rimandano
+# la "prova" a dopo. Aggiunto UN hook Outcome-first per pool (qui sotto e in
+# ogni sottocategoria di SUBCATEGORY_HOOKS), non sostituito nulla: e' un
+# quinto archetipo in rotazione con gli altri, non una sostituzione dei
+# quattro gia' verificati.
 PET_HOOKS = [
     "If you have a dog that sheds all year, this one's for you.",
     "Golden retriever owners already know where this is going.",
@@ -118,6 +137,7 @@ PET_HOOKS = [
     "If your dog destroys everything when you leave the house, it's not bad behavior, it's boredom.",
     "Multiple dogs, one afternoon, and it used to be complete chaos.",
     "The difference between a stressed dog and a calm one is smaller than you think.",
+    "Calm dog, quiet house, and it took less than a week.",
 ]
 PET_RESOLUTIONS = [
     "Here's what actually works.",
@@ -135,6 +155,7 @@ TECH_HOOKS = [
     "One clean setup instead of a tangled mess of cables every night.",
     "POV: your phone never falls again.",
     "Most people find out this breaks the hard way.",
+    "Phone still on the mount after every pothole since.",
 ]
 TECH_RESOLUTIONS = [
     "This one actually holds.",
@@ -242,6 +263,13 @@ SUBCATEGORY_KEYWORDS = {
 }
 
 SUBCATEGORY_HOOKS = {
+    # Outcome-first (2026-08-08, vedi il commento sopra PET_HOOKS/TECH_HOOKS
+    # per le fonti): un hook per sottocategoria che apre col risultato gia'
+    # ottenuto invece che con un problema/promessa - "Product/Outcome
+    # Showcase" e' l'archetipo con piu' views medie nell'analisi OpusClip
+    # 2026 su 34k TikTok. Aggiunto in coda a ogni pool, mai in sostituzione:
+    # gli altri 4 archetipi restano quelli gia' verificati il 2026-08-03.
+    #
     # Pool ampliati da 3 a 6-7 hook ciascuno (2026-08-02): un audit su 400
     # generazioni ha mostrato solo 29 hook/titoli distinti in totale, cioe'
     # a 2-4 video al giorno ci si ripeteva ogni ~10 giorni. Gli archetipi
@@ -298,6 +326,7 @@ SUBCATEGORY_HOOKS = {
         "Wiping four paws with a towel at the door never actually works.",
         "The walk isn't the problem, the ninety seconds after you get home is.",
         "If your dog tracks mud through the house after every single walk, this is why.",
+        "Clean paws, dry floor, no towel, in under a minute.",
     ],
     "PET_FEEDING": [
         "If your dog inhales dinner in nine seconds flat, that's a real problem.",
@@ -306,6 +335,7 @@ SUBCATEGORY_HOOKS = {
         "My vet asked one question about mealtimes and it explained everything.",
         "Your dog isn't greedy, the bowl is just the wrong shape.",
         "The bloating scare cost me a night at the emergency vet.",
+        "Six minutes for dinner now instead of nine seconds, and the bloating scare never came back.",
     ],
     # Spostati qui da PET_FEEDING il 2026-08-04: parlano di acqua, non di
     # cibo, e restando nello stesso pool finivano su prodotti-ciotola.
@@ -325,6 +355,7 @@ SUBCATEGORY_HOOKS = {
         "POV: your dog finally drinks on a walk instead of pulling toward every puddle.",
         "The mistake is packing a bottle he can't actually drink from.",
         "Halfway through every walk he stops, and it's never actually about being tired.",
+        "He drank on his own on a walk for the first time, no bribing, no puddles.",
     ],
     "PET_COMFORT": [
         "If your dog can't settle in summer, it's not restlessness, it's the heat.",
@@ -333,6 +364,7 @@ SUBCATEGORY_HOOKS = {
         "I kept turning the AC up for a dog who just needed a cold surface.",
         "Panting through the night isn't normal, it's a signal.",
         "The floor is winning against a bed you paid good money for.",
+        "He stopped panting through the night in under a week.",
     ],
     # PET_MOBILITY (2026-08-05, vedi SUBCATEGORY_KEYWORDS). Registro
     # volutamente diverso dalle altre pet: qui chi guarda ha un cane che sta
@@ -346,6 +378,7 @@ SUBCATEGORY_HOOKS = {
         "The vet asked one question about my sofa and it explained the limp.",
         "If your dog hesitates before jumping, that hesitation is the whole message.",
         "Watching a big dog struggle into the car is when it finally clicked.",
+        "He's jumping into the car again, no hesitation, no lift.",
     ],
     "PET_WALKING": [
         "If your dog pulls the whole walk, the leash is half the problem.",
@@ -354,6 +387,7 @@ SUBCATEGORY_HOOKS = {
         "My shoulder gave out before my dog's enthusiasm ever did.",
         "Pulling isn't disobedience, it's leverage, and you're losing it.",
         "The walk got easier the day I stopped blaming the dog.",
+        "No shoulder pain halfway through the walk anymore, and he still gets to lead.",
     ],
     "PET_TOYS": [
         "If your dog destroys everything when you leave, it's not bad behavior, it's boredom.",
@@ -362,6 +396,7 @@ SUBCATEGORY_HOOKS = {
         "I came home to a shredded sofa and finally understood the pattern.",
         "The chewing stops when the brain has something else to do.",
         "You're not buying a toy, you're buying twenty quiet minutes.",
+        "Zero shredded cushions this month, and he's more tired than I am.",
     ],
     # Aggiunta 2026-08-06, stessa ricerca trend di SUBCATEGORY_KEYWORDS sopra:
     # prima di questa sottocategoria un tracker GPS sarebbe caduto su
@@ -374,6 +409,7 @@ SUBCATEGORY_HOOKS = {
         "A tag with your number on it only works if a stranger finds him first.",
         "The scariest ten minutes of my week started with a front door left open.",
         "Every escape happens on the one day you weren't watching the yard.",
+        "Found him ninety seconds after he slipped out, not forty-five minutes of panic.",
     ],
     "TECH_CHARGING": [
         "One clean setup instead of a tangled mess of cables every night.",
@@ -382,6 +418,7 @@ SUBCATEGORY_HOOKS = {
         "I found out mine was faulty at four percent in an airport.",
         "Three cables on the nightstand and none of them the right one.",
         "The cable isn't broken, it's just never been fast in the first place.",
+        "Full charge by the time I'm out the door, not stuck at sixty percent.",
     ],
     "TECH_CAR": [
         "Your phone keeps sliding every time you brake, and there's a reason for that.",
@@ -390,6 +427,7 @@ SUBCATEGORY_HOOKS = {
         "Mine let go on a roundabout and I fished it out of the footwell.",
         "Looking down for two seconds is the whole reason this exists.",
         "Every cheap mount holds fine until the road stops being smooth.",
+        "Every pothole since, and it hasn't moved an inch.",
     ],
     "TECH_CASE": [
         "I stress-tested this case so you don't have to.",
@@ -398,6 +436,7 @@ SUBCATEGORY_HOOKS = {
         "Waist height onto tile is what actually breaks screens, not big falls.",
         "A repair quote costs more than every case I've ever bought combined.",
         "Thin and protective used to be a trade-off. It isn't anymore.",
+        "Dropped it on tile twice this month. Not a mark on the screen.",
     ],
     # Spostati qui da TECH_CASE il 2026-08-05 (vedi SUBCATEGORY_KEYWORDS):
     # parlano di non portare un secondo oggetto, non di cadute.
@@ -408,6 +447,7 @@ SUBCATEGORY_HOOKS = {
         "Nobody needs a wallet, a phone and a set of keys all in the same pocket.",
         "POV: you leave the house with one thing instead of three.",
         "The back pocket bulge was doing my posture no favours either.",
+        "One thing in my pocket now instead of three, and I haven't lost a card since.",
     ],
     # TECH_CARRY (2026-08-05, vedi SUBCATEGORY_KEYWORDS): mani libere e non
     # perdere il telefono, mai protezione dagli urti.
@@ -418,6 +458,7 @@ SUBCATEGORY_HOOKS = {
         "Nobody tells you how much easier traveling gets without a phone in your palm.",
         "The pocket isn't the issue, it's that you take it out forty times a day.",
         "I stopped putting my phone down on tables I'd walk away from.",
+        "Hands free all day, and I haven't set my phone down and forgotten it once.",
     ],
     "TECH_DESK": [
         "One bag instead of digging through a drawer of tangled cables.",
@@ -426,6 +467,7 @@ SUBCATEGORY_HOOKS = {
         "I've bought the same charger three times because I couldn't find it.",
         "The drawer isn't messy, it just has no system at all.",
         "Five minutes of packing turns into twenty when nothing has a place.",
+        "Same setup, half the cables, zero tangles in a month.",
     ],
     # Famiglie aggiunte 2026-08-05 (vedi SUBCATEGORY_KEYWORDS). Stessa regola
     # di varieta' del resto del file: archetipi diversi tra loro (prima
@@ -438,6 +480,7 @@ SUBCATEGORY_HOOKS = {
         "POV: the other driver changes their story the moment you mention the camera.",
         "It's not about crashes, it's about the argument afterwards.",
         "I found out what my car does while it's parked and I wasn't ready.",
+        "One clip and the insurance call took four minutes instead of four weeks.",
     ],
     "TECH_TRACKING": [
         "My bike was gone in under a minute and I had nothing to give the police.",
@@ -446,6 +489,7 @@ SUBCATEGORY_HOOKS = {
         "Nobody thinks about this until something expensive walks off.",
         "It cost less than the excess on my insurance claim.",
         "Knowing exactly where it is turns a disaster into a phone call.",
+        "Watched the dot move three streets over and had it back before dinner.",
     ],
     "TECH_SCREEN": [
         "Waist height onto tile is what actually cracks screens, not the dramatic falls.",
@@ -454,6 +498,7 @@ SUBCATEGORY_HOOKS = {
         "The scratch that ruins a screen comes from your pocket, not a drop.",
         "POV: it hits the pavement face down and you don't even flinch.",
         "Nobody regrets putting one on, plenty regret not bothering.",
+        "Face down on pavement twice this year. Not even a scratch.",
     ],
     "PET_ANXIETY": [
         "Fireworks night used to mean a dog shaking behind the sofa until morning.",
@@ -462,6 +507,7 @@ SUBCATEGORY_HOOKS = {
         "Nobody tells you how much a scared dog can't be talked out of it.",
         "The car journey was the problem, not the destination.",
         "I tried everything else first, which is the part I'd skip if I did it again.",
+        "He slept through fireworks night for the first time in three years.",
     ],
     "PET_HYGIENE": [
         "The accidents weren't the problem, the cleanup after them was.",
@@ -470,6 +516,7 @@ SUBCATEGORY_HOOKS = {
         "I was washing the same rug twice a week before I gave up.",
         "The fur on black trousers is its own separate hobby.",
         "POV: you stop finding surprises in the hallway every morning.",
+        "Three weeks, zero accidents on the rug.",
     ],
     "PET_TRAVEL": [
         "One hard brake with a loose dog in the back is all it takes.",
@@ -478,6 +525,7 @@ SUBCATEGORY_HOOKS = {
         "The car smelled like wet dog for two years before I fixed this.",
         "POV: the whole drive and he never once climbed into the front.",
         "It's the cheapest thing in the car that actually matters.",
+        "One hard brake on the motorway and he didn't move an inch off the seat.",
     ],
     "HOME_COOLING": [
         "The office hit thirty degrees and the building's AC gave up in July.",
@@ -486,6 +534,7 @@ SUBCATEGORY_HOOKS = {
         "Nobody tells you the commute is the worst part of a heatwave.",
         "I stopped fighting over the office thermostat and just sorted myself out.",
         "The one summer purchase I actually used every single day.",
+        "Thirty-four degrees outside and not a drop of sweat at my desk.",
     ],
     "HOME_STREAMING": [
         "If your laptop webcam makes you look like you're in a hostage video, this is for you.",
@@ -494,6 +543,7 @@ SUBCATEGORY_HOOKS = {
         "The lighting was never the problem, the camera was.",
         "I upgraded this and people asked what changed about my whole setup.",
         "Every video call looked worse than it needed to, for one cheap reason.",
+        "Same laptop, same room, and people asked what camera I'd switched to.",
     ],
     "HOME_SECURITY": [
         "I checked my home security footage and immediately ordered a second one.",
@@ -502,6 +552,7 @@ SUBCATEGORY_HOOKS = {
         "The peace of mind is worth more than the price tag.",
         "I used to guess who was at the door. Now I just check my phone.",
         "This caught something I never would have believed without the footage.",
+        "Saw exactly who took the parcel before the driver was even off the street.",
     ],
     "HOME_ENTERTAINMENT": [
         "The projector made movie night better than the actual cinema.",
@@ -510,6 +561,7 @@ SUBCATEGORY_HOOKS = {
         "I didn't expect a projector this size to actually be watchable.",
         "This turned a blank wall into the best screen in the house.",
         "The sound alone made the TV speakers feel pointless.",
+        "Blank wall, one cable, and it beat the cinema down the road.",
     ],
     "HOME_WEARABLE": [
         "Most smartwatches die by day three, this is the one that didn't.",
@@ -518,6 +570,7 @@ SUBCATEGORY_HOOKS = {
         "This tracked something about my sleep I never would have noticed.",
         "The one feature I thought was gimmicky turned out to be the best part.",
         "I replaced my old one for a battery that didn't die by lunch.",
+        "Still at forty percent after two full days, the first one that's ever made it that far.",
     ],
     "HOME_WORKSPACE": [
         "If you work from home, this is the upgrade nobody suggests.",
@@ -526,6 +579,7 @@ SUBCATEGORY_HOOKS = {
         "The cheap version breaks exactly when you need it most.",
         "I tested this for a week before I believed it.",
         "This costs less than what you're replacing every year.",
+        "Laptop still at eighty percent after a full day unplugged.",
     ],
 }
 
@@ -687,6 +741,7 @@ HOME_HOOKS = [
     "I tested this for a week before I believed it.",
     "Nobody mentions this until after you've already bought the wrong one.",
     "This costs less than what you're replacing every year.",
+    "Same desk, same room, and it finally looks like the setup you've been saving for.",
 ]
 HOME_RESOLUTIONS = [
     "Here's what actually works.",
